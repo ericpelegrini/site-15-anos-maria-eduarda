@@ -35,7 +35,7 @@ export default function App() {
   // Estado para controlar o carregamento do visual (Evita ecrã branco/truncado)
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const apiKey = "AIzaSyBA2NqIjykAr9C9T9XAqqMmmKhPhXx6dTc";
+  const apiKey = "";
 
   useEffect(() => {
     // 1. Corrige o Título da Aba do Navegador
@@ -51,7 +51,7 @@ export default function App() {
     link.type = 'image/png';
     link.href = '/icone.png';
 
-    // 3. Trava de segurança: Se o celular/WhatsApp demorar para carregar, força a abertura após 1.5s
+    // 3. Trava de segurança (Fallback Timer) anti-travamento no telemóvel/WhatsApp
     const fallbackTimer = setTimeout(() => {
       setIsLoaded(true);
     }, 1500);
@@ -64,18 +64,18 @@ export default function App() {
       script.src = 'https://cdn.tailwindcss.com';
       script.onload = () => {
         clearTimeout(fallbackTimer);
-        setIsLoaded(true);
+        setIsLoaded(true); // Liberta o site quando o visual carrega
       };
       script.onerror = () => {
         clearTimeout(fallbackTimer);
-        setIsLoaded(true); // Se der erro de rede, abre mesmo assim
+        setIsLoaded(true); // Se falhar a rede, força a abertura na mesma
       };
       document.head.appendChild(script);
     } else {
       clearTimeout(fallbackTimer);
       setIsLoaded(true);
     }
-    
+
     return () => clearTimeout(fallbackTimer);
   }, []);
 
@@ -174,7 +174,7 @@ export default function App() {
     document.body.removeChild(link);
   };
 
-  // TELA DE CARREGAMENTO
+  // TELA DE CARREGAMENTO ANIMADA
   if (!isLoaded) {
     return (
       <div style={{ 
@@ -199,7 +199,7 @@ export default function App() {
     <>
       <style>
         {`
-          @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Montserrat:wght@200;300;400;500&family=Playfair+Display:ital,wght@0,400;0,500;1,400&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Montserrat:wght@200;300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap');
           
           .font-script { font-family: 'Great Vibes', cursive; }
           .font-serif { font-family: 'Playfair Display', serif; }
@@ -258,7 +258,7 @@ export default function App() {
           style={{ backgroundImage: 'url("/fundo.jpeg")' }}
         ></div>
         
-        {/* Overlay sofisticado para escurecer o fundo - Tons de Vinho Escuro/Preto */}
+        {/* Overlay sofisticado para escurecer o fundo */}
         <div className="fixed inset-0 z-0 bg-gradient-to-b from-[#110103]/95 via-[#2a050b]/80 to-[#0a0002]/95"></div>
 
         {/* Conteúdo Principal */}
@@ -279,7 +279,7 @@ export default function App() {
             </div>
           </header>
 
-          {/* Navegação RESTAURADA AO ORIGINAL PERFEITO (Mas com texto levemente mais forte e sombreado) */}
+          {/* Navegação - Menu perfeitamente alinhado com drop-shadow escuro para legibilidade */}
           <nav className="flex flex-wrap justify-center gap-6 md:gap-10 mb-12 w-full max-w-3xl relative z-10">
             {[
               { id: 'convite', label: 'O Convite' },
@@ -301,7 +301,7 @@ export default function App() {
             ))}
           </nav>
 
-          {/* Painel de Conteúdo */}
+          {/* Painel de Conteúdo (Vidro) */}
           <main className="w-full max-w-3xl glass-panel rounded-lg p-8 md:p-16 transition-all duration-700">
             
             {/* TAB: ADMIN (ÁREA RESTRITA) */}
@@ -359,7 +359,6 @@ export default function App() {
                         
                         {rsvps.length === 0 ? <p className="text-center text-sm text-[#C7A153] italic">Nenhuma confirmação ainda.</p> : (
                           <div className="space-y-6">
-                            {/* Secção de Confirmados */}
                             <div>
                               <h4 className="text-[#FFF0B3] border-b border-[#C7A153]/30 pb-2 mb-3 text-sm uppercase tracking-widest flex items-center justify-between font-medium">
                                 Lista de Convidados (Confirmados)
@@ -374,7 +373,6 @@ export default function App() {
                                       <span className="text-[10px] text-[#C7A153] uppercase font-bold bg-[#C7A153]/10 px-2 py-1 rounded-sm">{rsvp.guests} pessoa(s)</span>
                                     </div>
                                     
-                                    {/* Exibição detalhada dos acompanhantes */}
                                     {(rsvp.companion || rsvp.child1Name || rsvp.child2Name || rsvp.child3Name) && (
                                       <div className="pl-3 border-l-2 border-[#C7A153]/20 space-y-1 mt-1">
                                         {rsvp.companion && <span className="block text-xs text-[#FFF0B3]"><span className="text-[#C7A153]">Companheiro(a):</span> {rsvp.companion}</span>}
@@ -388,7 +386,6 @@ export default function App() {
                               </div>
                             </div>
                             
-                            {/* Secção de Ausentes */}
                             <div>
                               <h4 className="text-[#FFF0B3] border-b border-[#C7A153]/30 pb-2 mb-3 text-sm uppercase tracking-widest flex items-center justify-between font-medium">
                                 Não irão (Ausentes)
@@ -451,10 +448,10 @@ export default function App() {
             {activeTab === 'convite' && (
               <div className="text-center space-y-12 animate-fade-in">
                 <div className="space-y-6">
-                  <h3 className="text-3xl md:text-4xl font-serif italic gold-gradient-text font-medium">
+                  <h3 className="text-3xl md:text-4xl font-serif italic gold-gradient-text font-semibold">
                     Venha comemorar este dia especial comigo.
                   </h3>
-                  <p className="text-[#FFF0B3] font-sans font-light text-sm md:text-base max-w-xl mx-auto leading-loose opacity-90">
+                  <p className="text-[#FFF0B3] font-sans font-medium text-sm md:text-base max-w-xl mx-auto leading-loose opacity-95">
                     Será muito divertido, separe uma roupa confortável, porém elegante, nada de jeans nesse dia tão importante.<br/><br/>
                     <span className="italic">Não é obrigatório, mas ficaria interessante se você for com uma máscara.</span>
                   </p>
@@ -466,8 +463,8 @@ export default function App() {
                   <div className="flex flex-col items-center gap-4">
                     <Calendar className="text-[#C7A153]" strokeWidth={1.5} size={36} />
                     <div className="space-y-1">
-                      <span className="block text-xl font-serif text-[#FFF0B3]">20 de Junho</span>
-                      <span className="block text-[10px] uppercase tracking-[0.3em] text-[#C7A153]">Sábado</span>
+                      <span className="block text-xl font-serif font-medium text-[#FFF0B3]">20 de Junho</span>
+                      <span className="block text-[10px] uppercase font-bold tracking-[0.3em] text-[#C7A153]">Sábado</span>
                     </div>
                   </div>
                   <div className="flex flex-col items-center gap-4 relative">
@@ -477,15 +474,15 @@ export default function App() {
                     
                     <Clock className="text-[#C7A153]" strokeWidth={1.5} size={36} />
                     <div className="space-y-1">
-                      <span className="block text-xl font-serif text-[#FFF0B3]">19:00h</span>
-                      <span className="block text-[10px] uppercase tracking-[0.3em] text-[#C7A153]">Horário</span>
+                      <span className="block text-xl font-serif font-medium text-[#FFF0B3]">19:00h</span>
+                      <span className="block text-[10px] uppercase font-bold tracking-[0.3em] text-[#C7A153]">Horário</span>
                     </div>
                   </div>
                   <div className="flex flex-col items-center gap-4">
                     <MapPin className="text-[#C7A153]" strokeWidth={1.5} size={36} />
                     <div className="space-y-1">
-                      <span className="block text-xl font-serif text-[#FFF0B3]">Clube Guarani</span>
-                      <span className="block text-[10px] text-[#C7A153] tracking-wider">
+                      <span className="block text-xl font-serif font-medium text-[#FFF0B3]">Clube Guarani</span>
+                      <span className="block text-[10px] font-bold text-[#C7A153] tracking-wider">
                         R. Taça Jules Rimet, 20<br />Salto - SP
                       </span>
                     </div>
@@ -496,17 +493,17 @@ export default function App() {
 
                 <div className="flex flex-col items-center gap-4 pt-4">
                   <Wine className="text-[#C7A153]" strokeWidth={1.5} size={32} />
-                  <p className="font-sans text-[#FFF0B3] font-light text-sm leading-loose max-w-lg opacity-90">
+                  <p className="font-sans text-[#FFF0B3] font-medium text-sm leading-loose max-w-lg opacity-95">
                     Na festa serão servidos sucos, refrigerantes e águas, mas sinta-se à vontade para levar o seu cooler com a sua bebida alcoólica preferida.
                   </p>
                 </div>
 
                 {/* ✨ Integração Gemini: Consultor de Máscaras */}
                 <div className="mt-12 pt-12 border-t border-[#C7A153]/30 flex flex-col items-center">
-                  <h4 className="text-xl font-serif italic text-[#FFF0B3] mb-4 flex items-center gap-3 font-medium">
+                  <h4 className="text-xl font-serif italic text-[#FFF0B3] mb-4 flex items-center gap-3 font-semibold">
                     <Wand2 size={24} className="text-[#C7A153]" /> Consultor de Máscaras ✨
                   </h4>
-                  <p className="font-sans text-[#FFF0B3] font-light text-sm mb-6 max-w-md opacity-90">
+                  <p className="font-sans text-[#FFF0B3] font-medium text-sm mb-6 max-w-md opacity-95">
                     Na dúvida de qual máscara usar? Descreva o estilo da sua roupa e nossa Inteligência Artificial vai sugerir a máscara perfeita para a noite.
                   </p>
                   <div className="flex flex-col sm:flex-row w-full max-w-lg gap-4 relative">
@@ -520,7 +517,7 @@ export default function App() {
                     <button 
                       onClick={handleMaskSuggestion}
                       disabled={isSuggestingMask || !maskStyle}
-                      className="border border-[#C7A153] text-[#FFF0B3] px-6 py-3 rounded-sm transition-all hover:bg-[#C7A153]/20 disabled:opacity-50 flex items-center justify-center gap-2 text-xs uppercase tracking-widest min-w-[140px] font-medium"
+                      className="border border-[#C7A153] text-[#FFF0B3] px-6 py-3 rounded-sm transition-all hover:bg-[#C7A153]/20 disabled:opacity-50 flex items-center justify-center gap-2 text-xs uppercase tracking-widest min-w-[140px] font-bold"
                     >
                       {isSuggestingMask ? <Loader2 size={16} className="animate-spin" /> : 'Sugerir'}
                     </button>
@@ -528,19 +525,19 @@ export default function App() {
                   {maskSuggestion && (
                     <div className="mt-8 p-6 glass-panel rounded-sm w-full max-w-lg animate-fade-in text-center sm:text-left relative">
                       <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#C7A153] to-transparent"></div>
-                      <p className="font-serif text-[#FFF0B3] font-normal leading-relaxed italic text-sm md:text-base">"{maskSuggestion}"</p>
+                      <p className="font-serif text-[#FFF0B3] font-medium leading-relaxed italic text-sm md:text-base">"{maskSuggestion}"</p>
                     </div>
                   )}
                 </div>
               </div>
             )}
 
-            {/* TAB: LISTA DE PRESENTES */}
+            {/* TAB: SUGESTÕES DE PRESENTE */}
             {activeTab === 'presentes' && (
               <div className="animate-fade-in space-y-12">
                 <div className="text-center space-y-4">
-                  <h3 className="text-3xl md:text-4xl font-serif italic gold-gradient-text font-medium">Sugestões de Presente</h3>
-                  <p className="font-sans text-[#FFF0B3] font-light text-sm max-w-lg mx-auto opacity-90">
+                  <h3 className="text-3xl md:text-4xl font-serif italic gold-gradient-text font-semibold">Sugestões de Presente</h3>
+                  <p className="font-sans text-[#FFF0B3] font-medium text-sm max-w-lg mx-auto opacity-95">
                     Abaixo estão algumas sugestões com minhas preferências. O que me der vou receber com muito amor!
                   </p>
                 </div>
@@ -548,55 +545,55 @@ export default function App() {
                 <div className="space-y-10">
                   {/* Categoria 1 */}
                   <div className="relative">
-                    <h4 className="text-sm font-medium uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center">Roupas & Sapatos</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-sm font-light text-[#FFF0B3]">
+                    <h4 className="text-sm font-bold uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center">Roupas & Sapatos</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-sm font-medium text-[#FFF0B3]">
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2">
-                        <span className="text-[#C7A153] font-medium">Blusinha</span> <span>Tam M</span>
+                        <span className="text-[#C7A153] font-bold">Blusinha</span> <span>Tam M</span>
                       </div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2">
-                        <span className="text-[#C7A153] font-medium">Short/Calça</span> <span>Tam M (Jeans 38)</span>
+                        <span className="text-[#C7A153] font-bold">Short/Calça</span> <span>Tam M (Jeans 38)</span>
                       </div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2">
-                        <span className="text-[#C7A153] font-medium">Vestido</span> <span>Tam M</span>
+                        <span className="text-[#C7A153] font-bold">Vestido</span> <span>Tam M</span>
                       </div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2">
-                        <span className="text-[#C7A153] font-medium">Sapatos/Tênis</span> <span>Tam 37</span>
+                        <span className="text-[#C7A153] font-bold">Sapatos/Tênis</span> <span>Tam 37</span>
                       </div>
                     </div>
-                    <p className="text-center text-[11px] italic text-[#C7A153] mt-4">Obs: Não uso nada muito curto. Estou mais acostumada com tênis.</p>
+                    <p className="text-center text-[11px] font-medium italic text-[#C7A153] mt-4">Obs: Não uso nada muito curto. Estou mais acostumada com tênis.</p>
                   </div>
 
                   {/* Categoria 2 */}
                   <div className="relative">
-                    <h4 className="text-sm font-medium uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center">Acessórios</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-sm font-light text-[#FFF0B3]">
+                    <h4 className="text-sm font-bold uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center">Acessórios</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-sm font-medium text-[#FFF0B3]">
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2">
-                        <span className="text-[#C7A153] font-medium">Brincos / Colar / Pulseira</span> <span>Prata ou Dourado</span>
+                        <span className="text-[#C7A153] font-bold">Brincos / Colar / Pulseira</span> <span>Prata ou Dourado</span>
                       </div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2">
-                        <span className="text-[#C7A153] font-medium">Anel</span> <span>Tam 16</span>
+                        <span className="text-[#C7A153] font-bold">Anel</span> <span>Tam 16</span>
                       </div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2">
-                        <span className="text-[#C7A153] font-medium">Bolsa</span> <span>Pequena</span>
+                        <span className="text-[#C7A153] font-bold">Bolsa</span> <span>Pequena</span>
                       </div>
                     </div>
-                    <p className="text-center text-[11px] italic text-[#C7A153] mt-4">Obs: Nada místico (olho grego, caveira, etc).</p>
+                    <p className="text-center text-[11px] font-medium italic text-[#C7A153] mt-4">Obs: Nada místico (olho grego, caveira, etc).</p>
                   </div>
 
                   {/* Categoria 3 */}
                   <div className="relative">
-                    <h4 className="text-sm font-medium uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center">Cosméticos</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-sm font-light text-[#FFF0B3]">
+                    <h4 className="text-sm font-bold uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center">Cosméticos</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-sm font-medium text-[#FFF0B3]">
                       <div className="flex flex-col border-b border-[#C7A153]/30 pb-2">
-                        <span className="text-[#C7A153] font-medium mb-1">Perfumes / Hidratantes</span> 
+                        <span className="text-[#C7A153] font-bold mb-1">Perfumes / Hidratantes</span> 
                         <span className="text-xs">Nada amadeirado ou doce/enjoativo demais.</span>
                       </div>
                       <div className="flex flex-col border-b border-[#C7A153]/30 pb-2">
-                        <span className="text-[#C7A153] font-medium mb-1">Cabelo</span> 
+                        <span className="text-[#C7A153] font-bold mb-1">Cabelo</span> 
                         <span className="text-xs">Produtos em geral.</span>
                       </div>
                       <div className="flex flex-col md:col-span-2 border-b border-[#C7A153]/30 pb-2 text-center items-center">
-                        <span className="text-[#C7A153] font-medium mb-1">Maquiagem</span> 
+                        <span className="text-[#C7A153] font-bold mb-1">Maquiagem</span> 
                         <span className="text-xs">Qualquer marca (exceto Max Love).</span>
                       </div>
                     </div>
@@ -605,7 +602,7 @@ export default function App() {
                   {/* Dica Extra */}
                   <div className="mt-8 text-center pt-8 border-t border-[#C7A153]/30">
                     <Heart className="mx-auto text-[#C7A153] mb-3" strokeWidth={1.5} size={24} />
-                    <p className="text-xs font-medium text-[#C7A153] uppercase tracking-widest">
+                    <p className="text-xs font-bold text-[#C7A153] uppercase tracking-widest">
                       Cores Favoritas: Vermelho, Rosa Bebê, Preto e Branco.
                     </p>
                   </div>
@@ -613,17 +610,17 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB: RSVP ATUALIZADA COM CAMPOS ESPECÍFICOS E CORES PADRONIZADAS */}
+            {/* TAB: PRESENÇA (RSVP) */}
             {activeTab === 'rsvp' && (
               <div className="max-w-md mx-auto animate-fade-in space-y-10">
                 <div className="text-center space-y-4">
-                  <h3 className="text-3xl font-serif italic gold-gradient-text font-medium">Confirme sua Presença</h3>
-                  <p className="font-sans text-[#FFF0B3] font-light text-sm opacity-90">
+                  <h3 className="text-3xl font-serif italic gold-gradient-text font-semibold">Confirme sua Presença</h3>
+                  <p className="font-sans text-[#FFF0B3] font-medium text-sm opacity-95">
                     Sua presença é fundamental. Por favor, confirme até o dia 10 de Junho.
                   </p>
                 </div>
 
-                <form onSubmit={handleRsvpSubmit} className="space-y-8 font-sans font-light">
+                <form onSubmit={handleRsvpSubmit} className="space-y-8 font-sans font-medium">
                   {/* Nome Principal */}
                   <div className="relative">
                     <input 
@@ -632,7 +629,7 @@ export default function App() {
                       placeholder="Seu Nome Completo"
                       value={rsvpForm.name}
                       onChange={(e) => setRsvpForm({...rsvpForm, name: e.target.value})}
-                      className="w-full input-elegant text-sm"
+                      className="w-full input-elegant text-sm font-medium"
                     />
                   </div>
                   
@@ -643,13 +640,13 @@ export default function App() {
                       placeholder="Nome do Companheiro(a) (Opcional)"
                       value={rsvpForm.companion}
                       onChange={(e) => setRsvpForm({...rsvpForm, companion: e.target.value})}
-                      className="w-full input-elegant text-sm"
+                      className="w-full input-elegant text-sm font-medium"
                     />
                   </div>
 
-                  {/* Filhos - COR E TAMANHO PADRONIZADOS E LEGÍVEIS */}
-                  <div className="pt-4 border-t border-[#C7A153]/30">
-                    <h4 className="text-xs font-medium uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center">Filhos</h4>
+                  {/* Filhos - TEXTO FORTE E BRILHANTE */}
+                  <div className="pt-4 border-t border-[#C7A153]/40">
+                    <h4 className="text-sm font-bold uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center drop-shadow-md">Filhos</h4>
                     
                     <div className="space-y-4">
                       {/* Filho 1 */}
@@ -659,14 +656,14 @@ export default function App() {
                           placeholder="Nome do Filho 1"
                           value={rsvpForm.child1Name}
                           onChange={(e) => setRsvpForm({...rsvpForm, child1Name: e.target.value})}
-                          className="flex-1 input-elegant text-sm"
+                          className="flex-1 input-elegant text-sm font-medium"
                         />
                         <input 
                           type="text" 
                           placeholder="Idade"
                           value={rsvpForm.child1Age}
                           onChange={(e) => setRsvpForm({...rsvpForm, child1Age: e.target.value})}
-                          className="w-16 input-elegant text-sm text-center"
+                          className="w-16 input-elegant text-sm text-center font-medium"
                         />
                       </div>
                       
@@ -677,14 +674,14 @@ export default function App() {
                           placeholder="Nome do Filho 2"
                           value={rsvpForm.child2Name}
                           onChange={(e) => setRsvpForm({...rsvpForm, child2Name: e.target.value})}
-                          className="flex-1 input-elegant text-sm"
+                          className="flex-1 input-elegant text-sm font-medium"
                         />
                         <input 
                           type="text" 
                           placeholder="Idade"
                           value={rsvpForm.child2Age}
                           onChange={(e) => setRsvpForm({...rsvpForm, child2Age: e.target.value})}
-                          className="w-16 input-elegant text-sm text-center"
+                          className="w-16 input-elegant text-sm text-center font-medium"
                         />
                       </div>
 
@@ -695,44 +692,44 @@ export default function App() {
                           placeholder="Nome do Filho 3"
                           value={rsvpForm.child3Name}
                           onChange={(e) => setRsvpForm({...rsvpForm, child3Name: e.target.value})}
-                          className="flex-1 input-elegant text-sm"
+                          className="flex-1 input-elegant text-sm font-medium"
                         />
                         <input 
                           type="text" 
                           placeholder="Idade"
                           value={rsvpForm.child3Age}
                           onChange={(e) => setRsvpForm({...rsvpForm, child3Age: e.target.value})}
-                          className="w-16 input-elegant text-sm text-center"
+                          className="w-16 input-elegant text-sm text-center font-medium"
                         />
                       </div>
                     </div>
                   </div>
 
-                  {/* Confirmação de Presença - COR E TAMANHO PADRONIZADOS E LEGÍVEIS */}
-                  <div className="pt-6 border-t border-[#C7A153]/30">
-                    <label className="block text-center text-[#FFF0B3] font-medium mb-6 text-xs uppercase tracking-[0.3em]">Você estará presente?</label>
+                  {/* Confirmação de Presença - TEXTO FORTE E BRILHANTE */}
+                  <div className="pt-6 border-t border-[#C7A153]/40">
+                    <label className="block text-center text-[#FFF0B3] font-bold mb-6 text-sm uppercase tracking-[0.3em] drop-shadow-md">Você estará presente?</label>
                     <div className="flex gap-6 justify-center">
                       <label className="cursor-pointer group flex flex-col items-center gap-2">
                         <input type="radio" name="attending" value="yes" className="hidden" checked={rsvpForm.attending === 'yes'} onChange={() => setRsvpForm({...rsvpForm, attending: 'yes'})} />
-                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${rsvpForm.attending === 'yes' ? 'border-[#C7A153] bg-[#C7A153] shadow-[0_0_10px_#C7A153]' : 'border-[#C7A153] bg-transparent'}`}>
-                           {rsvpForm.attending === 'yes' && <div className="w-1.5 h-1.5 bg-[#110103] rounded-full"></div>}
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${rsvpForm.attending === 'yes' ? 'border-[#C7A153] bg-[#C7A153] shadow-[0_0_12px_#C7A153]' : 'border-[#C7A153] bg-transparent'}`}>
+                           {rsvpForm.attending === 'yes' && <div className="w-2 h-2 bg-[#110103] rounded-full"></div>}
                         </div>
-                        <span className={`text-xs uppercase tracking-wider transition-all ${rsvpForm.attending === 'yes' ? 'text-[#FFF0B3] font-medium' : 'text-[#C7A153]'}`}>Com certeza</span>
+                        <span className={`text-xs uppercase tracking-wider transition-all ${rsvpForm.attending === 'yes' ? 'text-[#FFF0B3] font-bold' : 'text-[#C7A153] font-medium'}`}>Com certeza</span>
                       </label>
                       
                       <label className="cursor-pointer group flex flex-col items-center gap-2">
                         <input type="radio" name="attending" value="no" className="hidden" checked={rsvpForm.attending === 'no'} onChange={() => setRsvpForm({...rsvpForm, attending: 'no'})} />
-                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${rsvpForm.attending === 'no' ? 'border-[#C7A153]' : 'border-[#C7A153] bg-transparent'}`}>
-                           {rsvpForm.attending === 'no' && <div className="w-2 h-2 bg-[#C7A153] rounded-full"></div>}
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${rsvpForm.attending === 'no' ? 'border-[#C7A153]' : 'border-[#C7A153] bg-transparent'}`}>
+                           {rsvpForm.attending === 'no' && <div className="w-2.5 h-2.5 bg-[#C7A153] rounded-full"></div>}
                         </div>
-                        <span className={`text-xs uppercase tracking-wider transition-all ${rsvpForm.attending === 'no' ? 'text-[#FFF0B3] font-medium' : 'text-[#C7A153]'}`}>Não poderei</span>
+                        <span className={`text-xs uppercase tracking-wider transition-all ${rsvpForm.attending === 'no' ? 'text-[#FFF0B3] font-bold' : 'text-[#C7A153] font-medium'}`}>Não poderei</span>
                       </label>
                     </div>
                   </div>
 
                   <button 
                     type="submit" 
-                    className="w-full mt-8 border border-[#C7A153] hover:bg-[#C7A153]/20 text-[#FFF0B3] font-medium py-4 rounded-sm transition-all duration-500 text-xs uppercase tracking-[0.3em]"
+                    className="w-full mt-8 border border-[#C7A153] hover:bg-[#C7A153]/20 text-[#FFF0B3] font-bold py-4 rounded-sm transition-all duration-500 text-xs uppercase tracking-[0.3em] shadow-[0_0_15px_rgba(199,161,83,0.2)]"
                   >
                     Enviar Resposta
                   </button>
@@ -744,8 +741,8 @@ export default function App() {
             {activeTab === 'galeria' && (
               <div className="animate-fade-in space-y-10">
                 <div className="text-center space-y-4">
-                  <h3 className="text-3xl font-serif italic gold-gradient-text font-medium">Memórias Inesquecíveis</h3>
-                  <p className="font-sans text-[#FFF0B3] font-light text-sm max-w-lg mx-auto opacity-90">
+                  <h3 className="text-3xl font-serif italic gold-gradient-text font-semibold">Memórias Inesquecíveis</h3>
+                  <p className="font-sans text-[#FFF0B3] font-medium text-sm max-w-lg mx-auto opacity-95">
                     Tirou uma foto ou gravou um vídeo lindo na festa? Envie aqui e faça parte do nosso álbum digital.
                   </p>
                   
@@ -760,9 +757,9 @@ export default function App() {
                   <div className="pt-6">
                     <button 
                       onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-3 border border-[#C7A153] text-[#FFF0B3] px-8 py-3 rounded-full font-medium hover:bg-[#C7A153]/20 transition-all text-xs uppercase tracking-widest"
+                      className="inline-flex items-center gap-3 border border-[#C7A153] text-[#FFF0B3] px-8 py-3 rounded-full font-bold hover:bg-[#C7A153]/20 transition-all text-xs uppercase tracking-widest"
                     >
-                      <Upload size={16} strokeWidth={1.5} />
+                      <Upload size={16} strokeWidth={2} />
                       Carregar Foto ou Vídeo
                     </button>
                   </div>
@@ -771,7 +768,7 @@ export default function App() {
                 {photos.length === 0 ? (
                   <div className="text-center py-16 border border-dashed border-[#C7A153]/30 rounded-lg">
                     <Camera className="mx-auto text-[#C7A153] mb-4" strokeWidth={1.5} size={40} />
-                    <p className="font-serif italic text-[#C7A153]">A galeria aguarda os primeiros registos...</p>
+                    <p className="font-serif italic font-medium text-[#C7A153]">A galeria aguarda os primeiros registos...</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
@@ -796,8 +793,8 @@ export default function App() {
             {activeTab === 'recados' && (
               <div className="animate-fade-in space-y-10">
                 <div className="text-center space-y-4">
-                  <h3 className="text-3xl md:text-4xl font-serif italic gold-gradient-text font-medium">Livro de Ouro</h3>
-                  <p className="font-sans text-[#FFF0B3] font-light text-sm max-w-lg mx-auto opacity-90">
+                  <h3 className="text-3xl md:text-4xl font-serif italic gold-gradient-text font-semibold">Livro de Ouro</h3>
+                  <p className="font-sans text-[#FFF0B3] font-medium text-sm max-w-lg mx-auto opacity-95">
                     Deixe uma mensagem especial para a Maria Eduarda.
                   </p>
                 </div>
@@ -811,13 +808,13 @@ export default function App() {
                       placeholder="Seu Nome"
                       value={currentMessage.author}
                       onChange={(e) => setCurrentMessage({...currentMessage, author: e.target.value})}
-                      className="w-full input-elegant text-sm px-2"
+                      className="w-full input-elegant text-sm font-medium px-2"
                     />
                     <textarea 
                       placeholder="Escreva sua mensagem simples aqui..."
                       value={currentMessage.text}
                       onChange={(e) => setCurrentMessage({...currentMessage, text: e.target.value})}
-                      className="w-full input-elegant text-sm h-24 resize-none px-2 custom-scrollbar"
+                      className="w-full input-elegant text-sm font-medium h-24 resize-none px-2 custom-scrollbar"
                     />
                   </div>
 
@@ -825,7 +822,7 @@ export default function App() {
                     <button 
                       onClick={handleEnhanceMessage}
                       disabled={isEnhancing || !currentMessage.text}
-                      className="flex-1 border border-[#C7A153] text-[#FFF0B3] bg-[#C7A153]/10 hover:bg-[#C7A153]/30 font-medium py-4 rounded-sm transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="flex-1 border border-[#C7A153] text-[#FFF0B3] bg-[#C7A153]/10 hover:bg-[#C7A153]/30 font-bold py-4 rounded-sm transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {isEnhancing ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
                       ✨ Deixar Poético
@@ -852,7 +849,7 @@ export default function App() {
                   {messages.length === 0 ? (
                     <div className="text-center py-12 border border-dashed border-[#C7A153]/30 rounded-sm">
                       <MessageSquareText className="mx-auto text-[#C7A153] mb-4" strokeWidth={1.5} size={48} />
-                      <p className="font-serif italic text-[#C7A153]">As páginas deste livro ainda estão em branco...</p>
+                      <p className="font-serif italic font-medium text-[#C7A153]">As páginas deste livro ainda estão em branco...</p>
                     </div>
                   ) : (
                     messages.map(msg => (
@@ -868,9 +865,9 @@ export default function App() {
             )}
           </main>
           
-          {/* Rodapé - Ajustado com mais espaço e cadeado mais visível */}
+          {/* Rodapé */}
           <footer className="mt-16 text-center pb-16 flex flex-col items-center gap-4 relative z-10 w-full">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-[#C7A153]/60 font-medium">
+            <p className="text-[10px] uppercase tracking-[0.3em] text-[#C7A153]/60 font-bold">
               Maria Eduarda • Baile de Máscaras
             </p>
             <button 
