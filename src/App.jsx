@@ -32,7 +32,7 @@ export default function App() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [adminTab, setAdminTab] = useState('rsvps');
 
-  // Estado para controlar o carregamento do visual (Evita ecrã branco/truncado)
+  // Estado para controlar o carregamento do visual
   const [isLoaded, setIsLoaded] = useState(false);
 
   const apiKey = "";
@@ -41,7 +41,11 @@ export default function App() {
     // 1. Corrige o Título da Aba do Navegador
     document.title = "Aniversário 15 anos Maria Eduarda";
 
-    // 2. Injeta o Favicon da pasta public (icone.png)
+    // 2. Bloqueio Anti-Tradução Bizarra do Google Chrome
+    document.documentElement.setAttribute('lang', 'pt-BR');
+    document.documentElement.setAttribute('translate', 'no');
+
+    // 3. Injeta o Favicon da pasta public (icone.png)
     let link = document.querySelector("link[rel~='icon']");
     if (!link) {
       link = document.createElement('link');
@@ -51,12 +55,12 @@ export default function App() {
     link.type = 'image/png';
     link.href = '/icone.png';
 
-    // 3. Trava de segurança (Fallback Timer) anti-travamento no telemóvel/WhatsApp
+    // 4. Trava de segurança (Fallback Timer) anti-travamento no telemóvel/WhatsApp
     const fallbackTimer = setTimeout(() => {
       setIsLoaded(true);
     }, 1500);
 
-    // 4. Carrega o Tailwind CSS
+    // 5. Carrega o Tailwind CSS
     const existingScript = document.getElementById('tailwind-cdn');
     if (!existingScript) {
       const script = document.createElement('script');
@@ -251,7 +255,8 @@ export default function App() {
         `}
       </style>
 
-      <div className="min-h-screen text-[#C7A153] relative overflow-x-hidden font-sans custom-scrollbar">
+      {/* Adicionado o translate="no" para forçar navegadores a nunca tentarem traduzir nenhuma palavra do site */}
+      <div className="min-h-screen text-[#C7A153] relative overflow-x-hidden font-sans custom-scrollbar" translate="no">
         {/* Fundo dinâmico com a foto da menina */}
         <div 
           className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
@@ -279,10 +284,10 @@ export default function App() {
             </div>
           </header>
 
-          {/* Navegação - Menu perfeitamente alinhado com drop-shadow escuro para legibilidade */}
+          {/* Navegação - CORRIGIDO: Agora diz apenas 'Convite' e o navegador não tentará traduzir. */}
           <nav className="flex flex-wrap justify-center gap-6 md:gap-10 mb-12 w-full max-w-3xl relative z-10">
             {[
-              { id: 'convite', label: 'O Convite' },
+              { id: 'convite', label: 'Convite' },
               { id: 'presentes', label: 'Sugestões de Presente' },
               { id: 'rsvp', label: 'Presença' },
               { id: 'galeria', label: 'Galeria' },
