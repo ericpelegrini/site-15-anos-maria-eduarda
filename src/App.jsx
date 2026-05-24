@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Gift, CheckCircle, MapPin, Calendar, Clock, Info, Upload, Heart, Wine, Wand2, Loader2, MessageSquareText, Lock, Download, Users, LogOut } from 'lucide-react';
+import { Camera, Gift, CheckCircle, MapPin, Calendar, Clock, Info, Upload, Heart, Wine, Wand2, Loader2, MessageSquareText, Lock, Download, Users, LogOut, XCircle } from 'lucide-react';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, onSnapshot } from "firebase/firestore";
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 
-// --- CONFIGURAÇÃO DO FIREBASE (SEU BANCO DE DADOS) ---
+// --- CONFIGURAÇÃO DO FIREBASE ---
 const firebaseConfig = {
   apiKey: "AIzaSyAZ_JQZRNHMAoIXZ12Z3b9rTINf90t2ic1IAY",
   authDomain: "site-maria-eduarda-eaa2b.firebaseapp.com",
@@ -19,20 +19,22 @@ const db = getFirestore(app);
 export default function App() {
   const [activeTab, setActiveTab] = useState('convite');
   
-  // --- ESTADOS DE DADOS (FIREBASE SUBSTITUI A MEMÓRIA) ---
+  // --- ESTADOS DE DADOS (FIREBASE) ---
   const [rsvps, setRsvps] = useState([]);
   const [messages, setMessages] = useState([]);
   const [photos, setPhotos] = useState([]);
   
-  // --- ESTADOS DOS FORMULÁRIOS ---
+  // --- ESTADOS DO FORMULÁRIO DE PRESENÇA ---
   const [rsvpForm, setRsvpForm] = useState({ 
     name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' 
   });
+  const [rsvpStatus, setRsvpStatus] = useState(null); // Controla se o form foi enviado com sucesso
+  const [rsvpFeedbackMsg, setRsvpFeedbackMsg] = useState('');
+  
   const fileInputRef = useRef(null);
   
-  const [currentMessage, setCurrentMessage] = useState({ author: '', text: '' });
-
   // --- ESTADOS DA INTELIGÊNCIA ARTIFICIAL (GEMINI) ---
+  const [currentMessage, setCurrentMessage] = useState({ author: '', text: '' });
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [maskStyle, setMaskStyle] = useState('');
   const [maskSuggestion, setMaskSuggestion] = useState('');
@@ -44,16 +46,14 @@ export default function App() {
   const [adminTab, setAdminTab] = useState('rsvps');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const apiKey = ""; // A chave é injetada automaticamente pelo ambiente no momento da execução
+  const apiKey = ""; // A API Key será providenciada pelo ambiente
 
-  // --- EFEITO INICIAL: CARREGAR VISUAL E DADOS DO FIREBASE ---
+  // --- EFEITO INICIAL: CARREGAR DADOS E VISUAL ---
   useEffect(() => {
-    // Configurações da página para bloquear tradução bizarra
     document.title = "Aniversário 15 anos Maria Eduarda";
     document.documentElement.setAttribute('lang', 'pt-BR');
     document.documentElement.setAttribute('translate', 'no');
 
-    // Injeta o Favicon
     let link = document.querySelector("link[rel~='icon']");
     if (!link) {
       link = document.createElement('link');
@@ -63,10 +63,8 @@ export default function App() {
     link.type = 'image/png';
     link.href = '/icone.png';
 
-    // Timer de segurança anti-travamento
     const fallbackTimer = setTimeout(() => setIsLoaded(true), 1500);
 
-    // Carrega o Tailwind CSS
     const existingScript = document.getElementById('tailwind-cdn');
     if (!existingScript) {
       const script = document.createElement('script');
@@ -80,28 +78,24 @@ export default function App() {
       setIsLoaded(true);
     }
 
-    // LISTENER DO FIREBASE EM TEMPO REAL: Presenças
-    const unsubPresencas = onSnapshot(collection(db, "presencas"), (snapshot) => {
-      const p = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      p.sort((a, b) => new Date(b.data) - new Date(a.data)); // Ordena do mais recente para o mais antigo
-      setRsvps(p);
+    // Leitura em tempo real do Firebase (Presenças)
+    const unsubRsvps = onSnapshot(query(collection(db, "presencas"), orderBy("data", "desc")), (snapshot) => {
+      setRsvps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    // LISTENER DO FIREBASE EM TEMPO REAL: Mensagens
-    const unsubMensagens = onSnapshot(collection(db, "mensagens"), (snapshot) => {
-      const m = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      m.sort((a, b) => new Date(b.data) - new Date(a.data));
-      setMessages(m);
+    // Leitura em tempo real do Firebase (Mensagens)
+    const unsubMessages = onSnapshot(query(collection(db, "mensagens"), orderBy("data", "desc")), (snapshot) => {
+      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     return () => {
       clearTimeout(fallbackTimer);
-      unsubPresencas();
-      unsubMensagens();
+      unsubRsvps();
+      unsubMessages();
     };
   }, []);
 
-  // --- FUNÇÃO CENTRAL DA INTELIGÊNCIA ARTIFICIAL (GEMINI) ---
+  // --- FUNÇÃO DA API DO GEMINI ---
   const callGemini = async (prompt, systemInstruction, retries = 5, delay = 1000) => {
     try {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
@@ -114,7 +108,7 @@ export default function App() {
       });
       if (!response.ok) throw new Error('API request failed');
       const data = await response.json();
-      return data.candidates[0].content.parts[0].text;
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     } catch (error) {
       if (retries > 0) {
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -128,27 +122,35 @@ export default function App() {
   const handleEnhanceMessage = async () => {
     if (!currentMessage.text) return;
     setIsEnhancing(true);
-    const systemPrompt = "Você é um poeta de época, mestre de cerimônias de um baile de máscaras luxuoso. O usuário escreveu uma mensagem de feliz aniversário para a Maria Eduarda, que está fazendo 15 anos. Reescreva a mensagem de forma elegante, poética, sofisticada e com um toque de mistério. Mantenha o sentimento original. Seja breve (máximo de 3 frases curtas). Responda APENAS com a mensagem reescrita.";
+    const systemPrompt = "Você é um poeta de época, mestre de cerimônias de um baile de máscaras luxuoso. O usuário escreveu uma mensagem de feliz aniversário para a Maria Eduarda, que está fazendo 15 anos. Reescreva a mensagem de forma elegante, poética, sofisticada e com um toque de mistério. Mantenha o sentimento original. Seja breve (máximo de 3 frases curtas). Responda APENAS com a mensagem reescrita sem aspas.";
     const enhanced = await callGemini(`Mensagem original: "${currentMessage.text}"`, systemPrompt);
-    setCurrentMessage({ ...currentMessage, text: enhanced.replace(/"/g, '').trim() });
+    if (enhanced) setCurrentMessage({ ...currentMessage, text: enhanced.trim() });
     setIsEnhancing(false);
   };
 
   const handleMaskSuggestion = async () => {
     if (!maskStyle) return;
     setIsSuggestingMask(true);
-    const systemPrompt = "Você é um figurinista de luxo especialista em Bailes de Máscaras Venezianos. O convidado de uma festa de 15 anos descreveu o traje que vai usar. Sugira um tipo, formato e cor de máscara que combine perfeitamente. Dê um nome misterioso e elegante para a máscara sugerida. Seja sofisticado e inspirador. Máximo de 3 frases. Responda APENAS com a sugestão.";
+    const systemPrompt = "Você é um figurinista de luxo especialista EXCLUSIVAMENTE em Bailes de Máscaras Venezianos. O convidado de uma festa de 15 anos descreveu o traje que vai usar. Sugira um tipo, formato e cor de máscara que combine perfeitamente. REGRA ABSOLUTA: A máscara sugerida DEVE OBRIGATORIAMENTE ser do estilo Veneziano Clássico. JAMAIS sugira máscaras de personagens de filmes, heróis ou cultura pop. Dê um nome misterioso para a máscara veneziana. Seja sofisticado. Máximo de 3 frases. Responda APENAS com a sugestão.";
     const suggestion = await callGemini(`Meu estilo/traje: "${maskStyle}"`, systemPrompt);
-    setMaskSuggestion(suggestion.replace(/"/g, '').trim());
+    if (suggestion) setMaskSuggestion(suggestion.replace(/"/g, '').trim());
     setIsSuggestingMask(false);
   };
 
   const handleRsvpSubmit = async (e) => {
     e.preventDefault();
-    if (!rsvpForm.name.trim()) return;
+    const nomeDigitado = rsvpForm.name.trim();
+    if (!nomeDigitado) return;
+    
+    // VERIFICAÇÃO DE DUPLICIDADE (Evitar que a mesma pessoa preencha 2 vezes)
+    const isDuplicate = rsvps.some(r => r.name.toLowerCase().trim() === nomeDigitado.toLowerCase());
+    if (isDuplicate) {
+      alert("Este nome já consta na nossa lista de presenças! Se precisar alterar algo, entre em contato.");
+      return;
+    }
     
     try {
-      let totalGuests = 1; // Titular
+      let totalGuests = 1; 
       if (rsvpForm.companion.trim()) totalGuests++;
       if (rsvpForm.child1Name.trim()) totalGuests++;
       if (rsvpForm.child2Name.trim()) totalGuests++;
@@ -160,23 +162,28 @@ export default function App() {
         data: new Date().toISOString()
       });
       
+      // Define a mensagem visual maravilhosa baseada na resposta
+      setRsvpStatus(rsvpForm.attending);
+      if (rsvpForm.attending === 'yes') {
+        setRsvpFeedbackMsg("Sua presença foi confirmada com sucesso, nos vemos no baile!");
+      } else {
+        setRsvpFeedbackMsg("Que pena que você não poderá comparecer, sua presença fará muita falta!");
+      }
+      
       setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
-      alert('Confirmação enviada com sucesso! Muito obrigada.');
     } catch (error) {
-      alert("Houve um erro ao enviar sua confirmação. Tente novamente.");
+      alert("Houve um erro ao enviar sua confirmação. Verifique sua conexão e tente novamente.");
     }
   };
 
   const handleMessageSubmit = async () => {
     if (!currentMessage.author || !currentMessage.text) return;
-    
     try {
       await addDoc(collection(db, "mensagens"), {
         author: currentMessage.author,
         text: currentMessage.text,
         data: new Date().toISOString()
       });
-      
       setCurrentMessage({ author: '', text: '' });
       alert("Sua mensagem foi deixada no Livro de Ouro!");
     } catch (error) {
@@ -214,20 +221,16 @@ export default function App() {
     document.body.removeChild(link);
   };
 
-  // --- TELA DE CARREGAMENTO ANIMADA ---
   if (!isLoaded) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', width: '100vw', backgroundColor: '#0a0002', color: '#C7A153', fontFamily: 'sans-serif', flexDirection: 'column', gap: '20px' }}>
-        <style>
-          {`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}
-        </style>
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         <div style={{ width: '40px', height: '40px', border: '2px solid rgba(199, 161, 83, 0.2)', borderTop: '2px solid #C7A153', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
         <p style={{ letterSpacing: '3px', fontSize: '10px', textTransform: 'uppercase' }}>Preparando o Baile...</p>
       </div>
     );
   }
 
-  // --- INTERFACE VISUAL DO SITE ---
   return (
     <>
       <style>
@@ -238,61 +241,23 @@ export default function App() {
           .font-serif { font-family: 'Playfair Display', serif; }
           .font-sans { font-family: 'Montserrat', sans-serif; }
           
-          .gold-gradient-text {
-            background: linear-gradient(to right, #C7A153, #FFF0B3, #C7A153);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-size: 200% auto;
-          }
-          
-          .glass-panel {
-            background: rgba(20, 2, 6, 0.85);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(199, 161, 83, 0.2);
-            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(199, 161, 83, 0.05);
-          }
-          
-          .input-elegant {
-            background: transparent;
-            border: none;
-            border-bottom: 1px solid rgba(199, 161, 83, 0.5);
-            border-radius: 0;
-            padding: 12px 0;
-            color: #FFF0B3;
-            transition: all 0.4s ease;
-          }
-          
-          .input-elegant:focus {
-            outline: none;
-            border-bottom: 1px solid #C7A153;
-            box-shadow: 0 1px 0 0 #C7A153;
-          }
-
-          .input-elegant::placeholder {
-            color: rgba(199, 161, 83, 0.7);
-            font-weight: 300;
-          }
-            
-          .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: rgba(199, 161, 83, 0.5);
-            border-radius: 10px;
-          }
+          .gold-gradient-text { background: linear-gradient(to right, #C7A153, #FFF0B3, #C7A153); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-size: 200% auto; }
+          .glass-panel { background: rgba(20, 2, 6, 0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(199, 161, 83, 0.2); box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(199, 161, 83, 0.05); }
+          .input-elegant { background: transparent; border: none; border-bottom: 1px solid rgba(199, 161, 83, 0.5); border-radius: 0; padding: 12px 0; color: #FFF0B3; transition: all 0.4s ease; }
+          .input-elegant:focus { outline: none; border-bottom: 1px solid #C7A153; box-shadow: 0 1px 0 0 #C7A153; }
+          .input-elegant::placeholder { color: rgba(199, 161, 83, 0.7); font-weight: 300; }
+          .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+          .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(199, 161, 83, 0.5); border-radius: 10px; }
         `}
       </style>
 
       <div className="min-h-screen text-[#C7A153] relative overflow-x-hidden font-sans custom-scrollbar" translate="no">
-        {/* Fundo dinâmico com a foto da menina */}
         <div className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: 'url("/fundo.jpeg")' }}></div>
         <div className="fixed inset-0 z-0 bg-gradient-to-b from-[#110103]/95 via-[#2a050b]/80 to-[#0a0002]/95"></div>
 
-        {/* Conteúdo Principal */}
         <div className="relative z-10 container mx-auto px-4 py-12 md:py-20 min-h-screen flex flex-col items-center">
           
-          {/* Cabeçalho Elegante */}
+          {/* Cabeçalho */}
           <header className="text-center mb-12 w-full animate-fade-in-down flex flex-col items-center">
             <h2 className="text-xs md:text-sm tracking-[0.4em] uppercase mb-6 text-[#C7A153] font-light">Meus 15 Anos</h2>
             <h1 className="text-7xl md:text-8xl lg:text-9xl mb-6 font-script gold-gradient-text drop-shadow-2xl font-normal tracking-wide" style={{ lineHeight: '1.2' }}>
@@ -318,19 +283,17 @@ export default function App() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`pb-2 uppercase tracking-[0.2em] text-[11px] md:text-xs transition-all duration-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]
-                  ${activeTab === tab.id 
-                    ? 'text-[#FFF0B3] border-b border-[#C7A153] font-medium drop-shadow-[0_0_8px_rgba(199,161,83,0.8)]' 
-                    : 'text-[#C7A153] font-medium hover:text-[#FFF0B3] border-b border-transparent'}`}
+                  ${activeTab === tab.id ? 'text-[#FFF0B3] border-b border-[#C7A153] font-medium drop-shadow-[0_0_8px_rgba(199,161,83,0.8)]' : 'text-[#C7A153] font-medium hover:text-[#FFF0B3] border-b border-transparent'}`}
               >
                 {tab.label}
               </button>
             ))}
           </nav>
 
-          {/* Painel de Conteúdo (Vidro) */}
+          {/* Painel Central */}
           <main className="w-full max-w-3xl glass-panel rounded-lg p-8 md:p-16 transition-all duration-700">
             
-            {/* TAB: ADMIN (ÁREA RESTRITA LIGADA AO FIREBASE) */}
+            {/* TAB: ADMIN */}
             {activeTab === 'admin' && (
               <div className="animate-fade-in space-y-10">
                 {!isAdmin ? (
@@ -390,6 +353,17 @@ export default function App() {
                                 ))}
                               </div>
                             </div>
+                            <div>
+                              <h4 className="text-[#FFF0B3] border-b border-[#C7A153]/30 pb-2 mb-3 text-sm uppercase tracking-widest flex items-center justify-between font-medium">Não irão (Ausentes) <Users size={14} className="text-[#C7A153]" /></h4>
+                              <div className="space-y-2">
+                                {rsvps.filter(r => r.attending === 'no').map((rsvp, idx) => (
+                                  <div key={idx} className="flex justify-between items-center bg-[#110103]/20 p-3 rounded-sm border border-[#C7A153]/5 text-sm opacity-60">
+                                    <span className="text-[#FFF0B3] line-through">{rsvp.name}</span>
+                                    <span className="text-[10px] text-[#C7A153] uppercase">Não comparecerá</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -413,6 +387,9 @@ export default function App() {
                             {photos.map(photo => (
                               <div key={photo.id} className="relative group rounded-sm overflow-hidden border border-[#C7A153]/20 bg-black">
                                 {photo.type === 'video' ? <video src={photo.url} className="w-full h-32 object-cover" muted /> : <img src={photo.url} className="w-full h-32 object-cover" alt="Upload" />}
+                                <div className="absolute inset-0 bg-[#110103]/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                  <button onClick={() => handleDownloadPhoto(photo.url, photo.type === 'video' ? `video_${photo.id}.mp4` : `foto_${photo.id}.jpg`)} className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[#FFF0B3] border border-[#C7A153] px-3 py-2 bg-[#C7A153]/10"><Download size={14} /> Baixar</button>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -472,13 +449,13 @@ export default function App() {
                   </p>
                 </div>
 
-                {/* INTEGRAÇÃO GEMINI: CONSULTOR DE MÁSCARAS */}
+                {/* --- IA CONSULTOR DE MÁSCARAS --- */}
                 <div className="mt-12 pt-12 border-t border-[#C7A153]/30 flex flex-col items-center">
                   <h4 className="text-xl font-serif italic text-[#FFF0B3] mb-4 flex items-center gap-3 font-semibold">
                     <Wand2 size={24} className="text-[#C7A153]" /> Consultor de Máscaras ✨
                   </h4>
                   <p className="font-sans text-[#FFF0B3] font-medium text-sm mb-6 max-w-md opacity-95">
-                    Na dúvida de qual máscara usar? Descreva o estilo da sua roupa e nossa Inteligência Artificial vai sugerir a máscara perfeita para a noite.
+                    Na dúvida de qual máscara usar? Descreva o estilo da sua roupa e nossa Inteligência Artificial vai sugerir a máscara veneziana perfeita para a noite.
                   </p>
                   <div className="flex flex-col sm:flex-row w-full max-w-lg gap-4 relative">
                     <input type="text" value={maskStyle} onChange={(e) => setMaskStyle(e.target.value)} placeholder="Ex: Vestido longo vinho..." className="flex-1 input-elegant text-sm text-center sm:text-left px-2" />
@@ -537,42 +514,61 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB: PRESENÇA (RSVP FIREBASE) */}
+            {/* TAB: PRESENÇA (MENSAGEM DE SUCESSO OU FORMULÁRIO) */}
             {activeTab === 'rsvp' && (
               <div className="max-w-md mx-auto animate-fade-in space-y-10">
-                <div className="text-center space-y-4">
-                  <h3 className="text-3xl font-serif italic gold-gradient-text font-semibold">Confirme sua Presença</h3>
-                  <p className="font-sans text-[#FFF0B3] font-medium text-sm opacity-95">Sua presença é fundamental. Por favor, confirme até o dia 10 de Junho.</p>
-                </div>
+                {rsvpStatus ? (
+                  /* --- TELA DE SUCESSO PÓS-ENVIO --- */
+                  <div className="text-center p-10 border border-[#C7A153]/40 rounded-sm bg-[#110103]/80 shadow-[0_0_20px_rgba(199,161,83,0.15)] animate-fade-in">
+                    {rsvpStatus === 'yes' ? (
+                      <CheckCircle className="mx-auto text-[#C7A153] mb-4" size={56} strokeWidth={1.5} />
+                    ) : (
+                      <XCircle className="mx-auto text-[#C7A153] mb-4" size={56} strokeWidth={1.5} />
+                    )}
+                    <h4 className="text-2xl font-serif italic text-[#FFF0B3] mb-4">Obrigada!</h4>
+                    <p className="text-base font-sans text-[#FFF0B3] leading-relaxed">{rsvpFeedbackMsg}</p>
+                    <button onClick={() => setRsvpStatus(null)} className="mt-8 text-[10px] uppercase tracking-[0.2em] font-bold text-[#C7A153] hover:text-[#FFF0B3] border-b border-[#C7A153] pb-1 transition-all">
+                      Registrar outra pessoa
+                    </button>
+                  </div>
+                ) : (
+                  /* --- FORMULÁRIO NORMAL --- */
+                  <>
+                    <div className="text-center space-y-4">
+                      <h3 className="text-3xl font-serif italic gold-gradient-text font-semibold">Confirme sua Presença</h3>
+                      <p className="font-sans text-[#FFF0B3] font-medium text-sm opacity-95">Sua presença é fundamental. Por favor, confirme até o dia 10 de Junho.</p>
+                    </div>
 
-                <form onSubmit={handleRsvpSubmit} className="space-y-8 font-sans font-medium">
-                  <div className="relative"><input type="text" required placeholder="Seu Nome Completo" value={rsvpForm.name} onChange={(e) => setRsvpForm({...rsvpForm, name: e.target.value})} className="w-full input-elegant text-sm font-medium" /></div>
-                  <div className="relative"><input type="text" placeholder="Nome do Companheiro(a) (Opcional)" value={rsvpForm.companion} onChange={(e) => setRsvpForm({...rsvpForm, companion: e.target.value})} className="w-full input-elegant text-sm font-medium" /></div>
-                  <div className="pt-4 border-t border-[#C7A153]/40">
-                    <h4 className="text-sm font-bold uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center drop-shadow-md">Filhos</h4>
-                    <div className="space-y-4">
-                      <div className="flex gap-4"><input type="text" placeholder="Nome do Filho 1" value={rsvpForm.child1Name} onChange={(e) => setRsvpForm({...rsvpForm, child1Name: e.target.value})} className="flex-1 input-elegant text-sm font-medium" /><input type="text" placeholder="Idade" value={rsvpForm.child1Age} onChange={(e) => setRsvpForm({...rsvpForm, child1Age: e.target.value})} className="w-16 input-elegant text-sm text-center font-medium" /></div>
-                      <div className="flex gap-4"><input type="text" placeholder="Nome do Filho 2" value={rsvpForm.child2Name} onChange={(e) => setRsvpForm({...rsvpForm, child2Name: e.target.value})} className="flex-1 input-elegant text-sm font-medium" /><input type="text" placeholder="Idade" value={rsvpForm.child2Age} onChange={(e) => setRsvpForm({...rsvpForm, child2Age: e.target.value})} className="w-16 input-elegant text-sm text-center font-medium" /></div>
-                      <div className="flex gap-4"><input type="text" placeholder="Nome do Filho 3" value={rsvpForm.child3Name} onChange={(e) => setRsvpForm({...rsvpForm, child3Name: e.target.value})} className="flex-1 input-elegant text-sm font-medium" /><input type="text" placeholder="Idade" value={rsvpForm.child3Age} onChange={(e) => setRsvpForm({...rsvpForm, child3Age: e.target.value})} className="w-16 input-elegant text-sm text-center font-medium" /></div>
-                    </div>
-                  </div>
-                  <div className="pt-6 border-t border-[#C7A153]/40">
-                    <label className="block text-center text-[#FFF0B3] font-bold mb-6 text-sm uppercase tracking-[0.3em] drop-shadow-md">Você estará presente?</label>
-                    <div className="flex gap-6 justify-center">
-                      <label className="cursor-pointer group flex flex-col items-center gap-2">
-                        <input type="radio" name="attending" value="yes" className="hidden" checked={rsvpForm.attending === 'yes'} onChange={() => setRsvpForm({...rsvpForm, attending: 'yes'})} />
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${rsvpForm.attending === 'yes' ? 'border-[#C7A153] bg-[#C7A153] shadow-[0_0_12px_#C7A153]' : 'border-[#C7A153] bg-transparent'}`}>{rsvpForm.attending === 'yes' && <div className="w-2 h-2 bg-[#110103] rounded-full"></div>}</div>
-                        <span className={`text-xs uppercase tracking-wider transition-all ${rsvpForm.attending === 'yes' ? 'text-[#FFF0B3] font-bold' : 'text-[#C7A153] font-medium'}`}>Com certeza</span>
-                      </label>
-                      <label className="cursor-pointer group flex flex-col items-center gap-2">
-                        <input type="radio" name="attending" value="no" className="hidden" checked={rsvpForm.attending === 'no'} onChange={() => setRsvpForm({...rsvpForm, attending: 'no'})} />
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${rsvpForm.attending === 'no' ? 'border-[#C7A153]' : 'border-[#C7A153] bg-transparent'}`}>{rsvpForm.attending === 'no' && <div className="w-2.5 h-2.5 bg-[#C7A153] rounded-full"></div>}</div>
-                        <span className={`text-xs uppercase tracking-wider transition-all ${rsvpForm.attending === 'no' ? 'text-[#FFF0B3] font-bold' : 'text-[#C7A153] font-medium'}`}>Não poderei</span>
-                      </label>
-                    </div>
-                  </div>
-                  <button type="submit" className="w-full mt-8 border border-[#C7A153] hover:bg-[#C7A153]/20 text-[#FFF0B3] font-bold py-4 rounded-sm transition-all duration-500 text-xs uppercase tracking-[0.3em] shadow-[0_0_15px_rgba(199,161,83,0.2)]">Enviar Resposta</button>
-                </form>
+                    <form onSubmit={handleRsvpSubmit} className="space-y-8 font-sans font-medium">
+                      <div className="relative"><input type="text" required placeholder="Seu Nome Completo" value={rsvpForm.name} onChange={(e) => setRsvpForm({...rsvpForm, name: e.target.value})} className="w-full input-elegant text-sm font-medium" /></div>
+                      <div className="relative"><input type="text" placeholder="Nome do Companheiro(a) (Opcional)" value={rsvpForm.companion} onChange={(e) => setRsvpForm({...rsvpForm, companion: e.target.value})} className="w-full input-elegant text-sm font-medium" /></div>
+                      <div className="pt-4 border-t border-[#C7A153]/40">
+                        <h4 className="text-sm font-bold uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center drop-shadow-md">Filhos</h4>
+                        <div className="space-y-4">
+                          <div className="flex gap-4"><input type="text" placeholder="Nome do Filho 1" value={rsvpForm.child1Name} onChange={(e) => setRsvpForm({...rsvpForm, child1Name: e.target.value})} className="flex-1 input-elegant text-sm font-medium" /><input type="text" placeholder="Idade" value={rsvpForm.child1Age} onChange={(e) => setRsvpForm({...rsvpForm, child1Age: e.target.value})} className="w-16 input-elegant text-sm text-center font-medium" /></div>
+                          <div className="flex gap-4"><input type="text" placeholder="Nome do Filho 2" value={rsvpForm.child2Name} onChange={(e) => setRsvpForm({...rsvpForm, child2Name: e.target.value})} className="flex-1 input-elegant text-sm font-medium" /><input type="text" placeholder="Idade" value={rsvpForm.child2Age} onChange={(e) => setRsvpForm({...rsvpForm, child2Age: e.target.value})} className="w-16 input-elegant text-sm text-center font-medium" /></div>
+                          <div className="flex gap-4"><input type="text" placeholder="Nome do Filho 3" value={rsvpForm.child3Name} onChange={(e) => setRsvpForm({...rsvpForm, child3Name: e.target.value})} className="flex-1 input-elegant text-sm font-medium" /><input type="text" placeholder="Idade" value={rsvpForm.child3Age} onChange={(e) => setRsvpForm({...rsvpForm, child3Age: e.target.value})} className="w-16 input-elegant text-sm text-center font-medium" /></div>
+                        </div>
+                      </div>
+                      <div className="pt-6 border-t border-[#C7A153]/40">
+                        <label className="block text-center text-[#FFF0B3] font-bold mb-6 text-sm uppercase tracking-[0.3em] drop-shadow-md">Você estará presente?</label>
+                        <div className="flex gap-6 justify-center">
+                          <label className="cursor-pointer group flex flex-col items-center gap-2">
+                            <input type="radio" name="attending" value="yes" className="hidden" checked={rsvpForm.attending === 'yes'} onChange={() => setRsvpForm({...rsvpForm, attending: 'yes'})} />
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${rsvpForm.attending === 'yes' ? 'border-[#C7A153] bg-[#C7A153] shadow-[0_0_12px_#C7A153]' : 'border-[#C7A153] bg-transparent'}`}>{rsvpForm.attending === 'yes' && <div className="w-2 h-2 bg-[#110103] rounded-full"></div>}</div>
+                            <span className={`text-xs uppercase tracking-wider transition-all ${rsvpForm.attending === 'yes' ? 'text-[#FFF0B3] font-bold' : 'text-[#C7A153] font-medium'}`}>Com certeza</span>
+                          </label>
+                          <label className="cursor-pointer group flex flex-col items-center gap-2">
+                            <input type="radio" name="attending" value="no" className="hidden" checked={rsvpForm.attending === 'no'} onChange={() => setRsvpForm({...rsvpForm, attending: 'no'})} />
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${rsvpForm.attending === 'no' ? 'border-[#C7A153]' : 'border-[#C7A153] bg-transparent'}`}>{rsvpForm.attending === 'no' && <div className="w-2.5 h-2.5 bg-[#C7A153] rounded-full"></div>}</div>
+                            <span className={`text-xs uppercase tracking-wider transition-all ${rsvpForm.attending === 'no' ? 'text-[#FFF0B3] font-bold' : 'text-[#C7A153] font-medium'}`}>Não poderei</span>
+                          </label>
+                        </div>
+                      </div>
+                      <button type="submit" className="w-full mt-8 border border-[#C7A153] hover:bg-[#C7A153]/20 text-[#FFF0B3] font-bold py-4 rounded-sm transition-all duration-500 text-xs uppercase tracking-[0.3em] shadow-[0_0_15px_rgba(199,161,83,0.2)]">Enviar Resposta</button>
+                    </form>
+                  </>
+                )}
               </div>
             )}
 
@@ -601,7 +597,7 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB: LIVRO DE OURO (MENSAGENS LIGADAS AO GEMINI E FIREBASE) */}
+            {/* TAB: LIVRO DE OURO (MENSAGENS LIGADAS À IA E FIREBASE) */}
             {activeTab === 'recados' && (
               <div className="animate-fade-in space-y-10">
                 <div className="text-center space-y-4">
