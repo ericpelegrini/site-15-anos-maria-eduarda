@@ -28,13 +28,14 @@ export default function App() {
   const [rsvpForm, setRsvpForm] = useState({ 
     name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' 
   });
-  const [rsvpStatus, setRsvpStatus] = useState(null);
+  const [rsvpStatus, setRsvpStatus] = useState(null); // 'yes' | 'no' | null
   const [rsvpFeedbackMsg, setRsvpFeedbackMsg] = useState('');
   
   const fileInputRef = useRef(null);
   
   // --- ESTADOS DA INTELIGÊNCIA ARTIFICIAL (GEMINI) ---
-  const apiKey = ""; // A API Key será providenciada pelo ambiente
+  // A chave da API é injetada automaticamente pelo ambiente
+  const apiKey = ""; 
   
   const [currentMessage, setCurrentMessage] = useState({ author: '', text: '' });
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -43,12 +44,10 @@ export default function App() {
   const [maskSuggestion, setMaskSuggestion] = useState('');
   const [isSuggestingMask, setIsSuggestingMask] = useState(false);
 
-  // Novos estados para a IA de Presentes
   const [giftQuery, setGiftQuery] = useState('');
   const [giftSuggestion, setGiftSuggestion] = useState('');
   const [isSuggestingGift, setIsSuggestingGift] = useState(false);
 
-  // Novos estados para a IA de Brindes (Discursos)
   const [toastRelation, setToastRelation] = useState('');
   const [toastSuggestion, setToastSuggestion] = useState('');
   const [isGeneratingToast, setIsGeneratingToast] = useState(false);
@@ -89,14 +88,24 @@ export default function App() {
       setIsLoaded(true);
     }
 
-    // Leitura em tempo real do Firebase
-    const unsubRsvps = onSnapshot(query(collection(db, "presencas"), orderBy("data", "desc")), (snapshot) => {
-      setRsvps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    let unsubRsvps = () => {};
+    let unsubMessages = () => {};
 
-    const unsubMessages = onSnapshot(query(collection(db, "mensagens"), orderBy("data", "desc")), (snapshot) => {
-      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    try {
+      unsubRsvps = onSnapshot(query(collection(db, "presencas"), orderBy("data", "desc")), (snapshot) => {
+        setRsvps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }, (error) => {
+        console.error("Erro ao carregar presenças:", error);
+      });
+
+      unsubMessages = onSnapshot(query(collection(db, "mensagens"), orderBy("data", "desc")), (snapshot) => {
+        setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }, (error) => {
+        console.error("Erro ao carregar mensagens:", error);
+      });
+    } catch (e) {
+      console.error("Erro na inicialização do Firestore:", e);
+    }
 
     return () => {
       clearTimeout(fallbackTimer);
@@ -105,7 +114,7 @@ export default function App() {
     };
   }, []);
 
-  // --- FUNÇÃO DA API DO GEMINI ---
+  // --- FUNÇÃO DA API DO GEMINI CORRIGIDA (Sem travas) ---
   const callGemini = async (prompt, systemInstruction, retries = 5, delay = 1000) => {
     try {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
@@ -116,10 +125,15 @@ export default function App() {
           systemInstruction: { parts: [{ text: systemInstruction }] }
         })
       });
-      if (!response.ok) throw new Error('API request failed');
+      
+      if (!response.ok) {
+        throw new Error('Falha na requisição da API');
+      }
+      
       const data = await response.json();
       return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     } catch (error) {
+      console.error("Erro ao chamar o Gemini:", error);
       if (retries > 0) {
         await new Promise(resolve => setTimeout(resolve, delay));
         return callGemini(prompt, systemInstruction, retries - 1, delay * 2);
@@ -165,7 +179,7 @@ export default function App() {
     setIsGeneratingToast(false);
   };
 
-  // --- AÇÕES DE NEGÓCIO ---
+  // --- AÇÕES DO FORMULÁRIO E FIREBASE ---
   const handleRsvpSubmit = async (e) => {
     e.preventDefault();
     const nomeDigitado = rsvpForm.name.trim();
@@ -200,21 +214,25 @@ export default function App() {
       if (rsvpForm.child2Name.trim()) totalGuests++;
       if (rsvpForm.child3Name.trim()) totalGuests++;
       
+      // Salvar no Firebase
       await addDoc(collection(db, "presencas"), {
         ...rsvpForm,
         guests: totalGuests,
         data: new Date().toISOString()
       });
       
-      setRsvpStatus(rsvpForm.attending);
+      // CONFIGURAR FEEDBACK VISUAL
+      setRsvpStatus(rsvpForm.attending); 
       if (rsvpForm.attending === 'yes') {
         setRsvpFeedbackMsg("A sua presença foi confirmada com sucesso, vemo-nos no baile!");
       } else {
         setRsvpFeedbackMsg("Que pena que não poderá comparecer, a sua presença fará muita falta!");
       }
       
+      // Limpar formulário, mas manter o status ativo para mostrar a mensagem
       setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
     } catch (error) {
+      console.error("Erro ao salvar RSVP:", error);
       alert("Houve um erro ao enviar a sua confirmação. Verifique a sua ligação e tente novamente.");
     }
   };
@@ -233,6 +251,7 @@ export default function App() {
       setCurrentMessage({ author: '', text: '' });
       alert("A sua mensagem foi deixada no Livro de Ouro!");
     } catch (error) {
+      console.error("Erro ao salvar mensagem:", error);
       alert("Erro ao assinar o livro. Tente novamente.");
     }
   };
@@ -474,12 +493,14 @@ export default function App() {
                       <span className="block text-[10px] uppercase font-bold tracking-[0.3em] text-[#C7A153]">Horário</span>
                     </div>
                   </div>
-                  {/* --- ENDEREÇO CLICÁVEL --- */}
+                  
+                  {/* ENDEREÇO CLICÁVEL (GOOGLE MAPS) COM ROTA DIRETA E SEGURA */}
                   <a 
-                    href="https://maps.app.goo.gl/tDbbY48G9B1fH6Pq8" 
+                    href="https://maps.app.goo.gl/bdwsnZq7ipQEJhQL9" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="flex flex-col items-center gap-4 hover:scale-105 transition-transform duration-300 cursor-pointer group"
+                    style={{ textDecoration: 'none' }}
                   >
                     <MapPin className="text-[#C7A153] group-hover:text-[#FFF0B3] transition-colors" strokeWidth={1.5} size={36} />
                     <div className="space-y-1 text-center">
@@ -503,7 +524,7 @@ export default function App() {
                 {/* --- IA CONSULTOR DE MÁSCARAS --- */}
                 <div className="mt-12 pt-12 border-t border-[#C7A153]/30 flex flex-col items-center">
                   <h4 className="text-xl font-serif italic text-[#FFF0B3] mb-4 flex items-center gap-3 font-semibold">
-                    <Wand2 size={24} className="text-[#C7A153]" /> Consultor de Máscaras
+                    <Wand2 size={24} className="text-[#C7A153]" /> Consultor de Máscaras ✨
                   </h4>
                   <p className="font-sans text-[#FFF0B3] font-medium text-sm mb-6 max-w-md opacity-95">
                     Na dúvida sobre qual máscara usar? Descreva o estilo da sua roupa e a nossa Inteligência Artificial vai sugerir a máscara veneziana perfeita para a noite.
@@ -511,7 +532,7 @@ export default function App() {
                   <div className="flex flex-col sm:flex-row w-full max-w-lg gap-4 relative">
                     <input type="text" value={maskStyle} onChange={(e) => setMaskStyle(e.target.value)} placeholder="Ex: Vestido comprido vinho..." className="flex-1 input-elegant text-sm text-center sm:text-left px-2" />
                     <button onClick={handleMaskSuggestion} disabled={isSuggestingMask || !maskStyle} className="border border-[#C7A153] text-[#FFF0B3] px-6 py-3 rounded-sm transition-all hover:bg-[#C7A153]/20 disabled:opacity-50 flex items-center justify-center gap-2 text-xs uppercase tracking-widest min-w-[140px] font-bold">
-                      {isSuggestingMask ? <Loader2 size={16} className="animate-spin" /> : 'Sugerir ✨'}
+                      {isSuggestingMask ? <Loader2 size={16} className="animate-spin" /> : 'Sugerir'}
                     </button>
                   </div>
                   {maskSuggestion && (
@@ -593,6 +614,7 @@ export default function App() {
             {activeTab === 'rsvp' && (
               <div className="max-w-md mx-auto animate-fade-in space-y-10">
                 {rsvpStatus ? (
+                  /* --- TELA DE SUCESSO PÓS-ENVIO --- */
                   <div className="text-center p-10 border border-[#C7A153]/40 rounded-sm bg-[#110103]/80 shadow-[0_0_20px_rgba(199,161,83,0.15)] animate-fade-in">
                     {rsvpStatus === 'yes' ? (
                       <CheckCircle className="mx-auto text-[#C7A153] mb-4" size={56} strokeWidth={1.5} />
@@ -606,6 +628,7 @@ export default function App() {
                     </button>
                   </div>
                 ) : (
+                  /* --- FORMULÁRIO NORMAL --- */
                   <>
                     <div className="text-center space-y-4">
                       <h3 className="text-3xl font-serif italic gold-gradient-text font-semibold">Confirme a sua Presença</h3>
@@ -691,6 +714,7 @@ export default function App() {
                       Assinar Livro
                     </button>
                   </div>
+                  <p className="text-[11px] text-center text-[#C7A153] italic mt-4 font-medium">✨ Dica Mágica: Escreva algo simples e clique em "Deixar Poético" para a nossa IA transformar as suas palavras num texto digno da realeza!</p>
                 </div>
 
                 {/* --- IA GERADOR DE BRINDES / DISCURSOS --- */}
