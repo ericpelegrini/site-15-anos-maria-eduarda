@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Gift, CheckCircle, MapPin, Calendar, Clock, Info, Upload, Heart, Wine, Wand2, Loader2, MessageSquareText, Lock, Download, Users, LogOut, XCircle } from 'lucide-react';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { getFirestore, collection, addDoc, onSnapshot } from "firebase/firestore";
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "firebase/auth";
 
-// --- CONFIGURAÇÃO DO FIREBASE ---
-const firebaseConfig = {
+// --- CONFIGURAÇÃO DO FIREBASE (HÍBRIDA PARA PREVIEW E VERCEL) ---
+const isCanvasPreview = typeof __firebase_config !== 'undefined';
+
+const firebaseConfig = isCanvasPreview ? JSON.parse(__firebase_config) : {
   apiKey: "AIzaSyAZ_JQZRNHMAoIXZ12Z3b9rTINf90t2ic1IAY",
   authDomain: "site-maria-eduarda-eaa2b.firebaseapp.com",
   projectId: "site-maria-eduarda-eaa2b",
@@ -15,6 +18,18 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app); // Inicializa a autenticação sempre
+
+// Evita o erro de segmentos inválidos limpando o ID do App
+const appId = typeof __app_id !== 'undefined' ? __app_id.replace(/\//g, '_') : 'default-app-id';
+
+// Função inteligente para rotear os dados corretamente dependendo de onde o site está a rodar
+const getCollRef = (name) => {
+  if (isCanvasPreview) {
+    return collection(db, 'artifacts', appId, 'public', 'data', name);
+  }
+  return collection(db, name); // Usa a raiz normal quando publicado na Vercel
+};
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('convite');
@@ -23,6 +38,7 @@ export default function App() {
   const [rsvps, setRsvps] = useState([]);
   const [messages, setMessages] = useState([]);
   const [photos, setPhotos] = useState([]);
+  const [user, setUser] = useState(null);
   
   // --- ESTADOS DO FORMULÁRIO DE PRESENÇA ---
   const [rsvpForm, setRsvpForm] = useState({ 
@@ -34,7 +50,6 @@ export default function App() {
   const fileInputRef = useRef(null);
   
   // --- ESTADOS DA INTELIGÊNCIA ARTIFICIAL (GEMINI) ---
-  // A chave da API é injetada automaticamente pelo ambiente
   const apiKey = ""; 
   
   const [currentMessage, setCurrentMessage] = useState({ author: '', text: '' });
@@ -58,7 +73,7 @@ export default function App() {
   const [adminTab, setAdminTab] = useState('rsvps');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // --- EFEITO INICIAL: CARREGAR DADOS E VISUAL ---
+  // --- EFEITO 1: AUTENTICAÇÃO E CARREGAMENTO VISUAL ---
   useEffect(() => {
     document.title = "Aniversário 15 anos Maria Eduarda";
     document.documentElement.setAttribute('lang', 'pt-BR');
@@ -88,33 +103,53 @@ export default function App() {
       setIsLoaded(true);
     }
 
-    let unsubRsvps = () => {};
-    let unsubMessages = () => {};
+    // Inicializa a autenticação (REGRA 3: AUTH BEFORE QUERIES)
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Erro de Autenticação:", error);
+      }
+    };
+    initAuth();
 
-    try {
-      unsubRsvps = onSnapshot(query(collection(db, "presencas"), orderBy("data", "desc")), (snapshot) => {
-        setRsvps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      }, (error) => {
-        console.error("Erro ao carregar presenças:", error);
-      });
-
-      unsubMessages = onSnapshot(query(collection(db, "mensagens"), orderBy("data", "desc")), (snapshot) => {
-        setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      }, (error) => {
-        console.error("Erro ao carregar mensagens:", error);
-      });
-    } catch (e) {
-      console.error("Erro na inicialização do Firestore:", e);
-    }
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
 
     return () => {
       clearTimeout(fallbackTimer);
-      unsubRsvps();
-      unsubMessages();
+      unsubscribeAuth();
     };
   }, []);
 
-  // --- FUNÇÃO DA API DO GEMINI CORRIGIDA (Sem travas) ---
+  // --- EFEITO 2: BUSCA DE DADOS (APENAS APÓS AUTENTICAÇÃO) ---
+  useEffect(() => {
+    if (!user) return; // Aguarda a autenticação concluir para evitar erros de permissão
+
+    const unsubRsvps = onSnapshot(getCollRef("presencas"), (snapshot) => {
+      let dataList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      dataList.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+      setRsvps(dataList);
+    }, (error) => console.error("Erro RSVPs:", error));
+
+    const unsubMessages = onSnapshot(getCollRef("mensagens"), (snapshot) => {
+      let dataList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      dataList.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+      setMessages(dataList);
+    }, (error) => console.error("Erro Mensagens:", error));
+
+    return () => {
+      unsubRsvps();
+      unsubMessages();
+    };
+  }, [user]);
+
+  // --- FUNÇÃO DA API DO GEMINI 100% BLINDADA ---
   const callGemini = async (prompt, systemInstruction, retries = 5, delay = 1000) => {
     try {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
@@ -126,11 +161,9 @@ export default function App() {
         })
       });
       
-      if (!response.ok) {
-        throw new Error('Falha na requisição da API');
-      }
-      
       const data = await response.json();
+      if (data.error) throw new Error(data.error.message);
+      
       return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     } catch (error) {
       console.error("Erro ao chamar o Gemini:", error);
@@ -179,9 +212,21 @@ export default function App() {
     setIsGeneratingToast(false);
   };
 
+  // --- ABERTURA FORÇADA E SEGURA DO MAPA ---
+  const handleMapOpen = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    window.open("https://maps.app.goo.gl/bdwsnZq7ipQEJhQL9", "_blank", "noopener,noreferrer");
+  };
+
   // --- AÇÕES DO FORMULÁRIO E FIREBASE ---
   const handleRsvpSubmit = async (e) => {
     e.preventDefault();
+    if (!user) {
+      alert("Aguarde a conexão com o servidor ser estabelecida.");
+      return;
+    }
+
     const nomeDigitado = rsvpForm.name.trim();
     if (!nomeDigitado) {
         alert("O Nome Completo é obrigatório.");
@@ -215,7 +260,7 @@ export default function App() {
       if (rsvpForm.child3Name.trim()) totalGuests++;
       
       // Salvar no Firebase
-      await addDoc(collection(db, "presencas"), {
+      await addDoc(getCollRef("presencas"), {
         ...rsvpForm,
         guests: totalGuests,
         data: new Date().toISOString()
@@ -229,7 +274,7 @@ export default function App() {
         setRsvpFeedbackMsg("Que pena que não poderá comparecer, a sua presença fará muita falta!");
       }
       
-      // Limpar formulário, mas manter o status ativo para mostrar a mensagem
+      // Limpar formulário
       setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
     } catch (error) {
       console.error("Erro ao salvar RSVP:", error);
@@ -238,12 +283,13 @@ export default function App() {
   };
 
   const handleMessageSubmit = async () => {
+    if (!user) return;
     if (!currentMessage.author || !currentMessage.text) {
         alert("Por favor, preencha o seu nome e a mensagem.");
         return;
     }
     try {
-      await addDoc(collection(db, "mensagens"), {
+      await addDoc(getCollRef("mensagens"), {
         author: currentMessage.author,
         text: currentMessage.text,
         data: new Date().toISOString()
@@ -495,12 +541,10 @@ export default function App() {
                   </div>
                   
                   {/* ENDEREÇO CLICÁVEL (GOOGLE MAPS) COM ROTA DIRETA E SEGURA */}
-                  <a 
-                    href="https://maps.app.goo.gl/bdwsnZq7ipQEJhQL9" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex flex-col items-center gap-4 hover:scale-105 transition-transform duration-300 cursor-pointer group"
-                    style={{ textDecoration: 'none' }}
+                  <button 
+                    onClick={handleMapOpen}
+                    type="button"
+                    className="flex flex-col items-center gap-4 hover:scale-105 transition-transform duration-300 cursor-pointer group bg-transparent border-none outline-none"
                   >
                     <MapPin className="text-[#C7A153] group-hover:text-[#FFF0B3] transition-colors" strokeWidth={1.5} size={36} />
                     <div className="space-y-1 text-center">
@@ -509,7 +553,7 @@ export default function App() {
                         R. Taça Jules Rimet, 20<br />Salto - SP
                       </span>
                     </div>
-                  </a>
+                  </button>
                 </div>
 
                 <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-[#C7A153]/50 to-transparent"></div>
@@ -686,6 +730,9 @@ export default function App() {
                     {photos.map(photo => (
                       <div key={photo.id} className="aspect-square overflow-hidden rounded-sm border border-[#C7A153]/30 group relative bg-black">
                         {photo.type === 'video' ? <video src={photo.url} className="w-full h-full object-cover" autoPlay muted loop playsInline /> : <img src={photo.url} alt="Festa" className="w-full h-full object-cover" />}
+                        <div className="absolute inset-0 bg-[#110103]/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                          <button onClick={() => handleDownloadPhoto(photo.url, photo.type === 'video' ? `video_${photo.id}.mp4` : `foto_${photo.id}.jpg`)} className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[#FFF0B3] border border-[#C7A153] px-3 py-2 bg-[#C7A153]/10"><Download size={14} /> Baixar</button>
+                        </div>
                       </div>
                     ))}
                   </div>
