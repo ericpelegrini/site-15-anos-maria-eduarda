@@ -2,12 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Gift, CheckCircle, MapPin, Calendar, Clock, Info, Upload, Heart, Wine, Wand2, Loader2, MessageSquareText, Lock, Download, Users, LogOut, XCircle } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, onSnapshot } from "firebase/firestore";
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "firebase/auth";
 
-// --- CONFIGURAÇÃO DO FIREBASE (HÍBRIDA PARA PREVIEW E VERCEL) ---
-const isCanvasPreview = typeof __firebase_config !== 'undefined';
-
-let parsedConfig = {
+// --- CONFIGURAÇÃO DO FIREBASE (SEU BANCO DE DADOS OFICIAL) ---
+const firebaseConfig = {
   apiKey: "AIzaSyAZ_JQZRNHMAoIXZ12Z3b9rTINf90t2ic1IAY",
   authDomain: "site-maria-eduarda-eaa2b.firebaseapp.com",
   projectId: "site-maria-eduarda-eaa2b",
@@ -16,29 +13,8 @@ let parsedConfig = {
   appId: "1:68809862594:web:234f9e5f7689fbebeb2cb"
 };
 
-// Evita o travamento (Tela Vermelha "Algo deu errado") ao processar as configurações no ambiente de testes
-if (isCanvasPreview) {
-  try {
-    parsedConfig = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
-  } catch (error) {
-    console.error("Erro ao analisar configurações do Firebase:", error);
-  }
-}
-
-const app = initializeApp(parsedConfig);
+const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app);
-
-// Sanitiza o ID do aplicativo de forma segura
-const safeAppId = typeof __app_id !== 'undefined' ? String(__app_id).replace(/\//g, '_') : 'default-app-id';
-
-// Função inteligente que direciona os dados para o lugar certo (Preview vs Vercel)
-const getCollRef = (name) => {
-  if (isCanvasPreview) {
-    return collection(db, 'artifacts', safeAppId, 'public', 'data', name);
-  }
-  return collection(db, name);
-};
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('convite');
@@ -47,7 +23,6 @@ export default function App() {
   const [rsvps, setRsvps] = useState([]);
   const [messages, setMessages] = useState([]);
   const [photos, setPhotos] = useState([]);
-  const [user, setUser] = useState(null);
   
   // --- ESTADOS DO FORMULÁRIO DE PRESENÇA ---
   const [rsvpForm, setRsvpForm] = useState({ 
@@ -59,10 +34,9 @@ export default function App() {
   const fileInputRef = useRef(null);
   
   // ----------------------------------------------------------------------
-  // CONFIGURAÇÃO DA CHAVE DE IA - MODO INTELIGENTE
-  // No Preview usa chave vazia. Na Vercel, usa a chave que você gerou.
+  // CHAVE DIRETA DA IA GEMINI
   // ----------------------------------------------------------------------
-  const apiKey = isCanvasPreview ? "" : "AIzaSyBA2NqIjykAr9C9T9XAqqMmmKhPhXx6dTc"; 
+  const apiKey = "AIzaSyBA2NqIjykAr9C9T9XAqqMmmKhPhXx6dTc"; 
   
   const [currentMessage, setCurrentMessage] = useState({ author: '', text: '' });
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -84,7 +58,7 @@ export default function App() {
   const [adminTab, setAdminTab] = useState('rsvps');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // --- EFEITO 1: AUTENTICAÇÃO E CARREGAMENTO VISUAL ---
+  // --- EFEITO 1: CARREGAMENTO VISUAL ---
   useEffect(() => {
     document.title = "Aniversário 15 anos Maria Eduarda";
     document.documentElement.setAttribute('lang', 'pt-BR');
@@ -114,38 +88,16 @@ export default function App() {
       setIsLoaded(true);
     }
 
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (error) {
-        console.error("Aviso de Autenticação Silenciosa:", error);
-      }
-    };
-    initAuth();
-
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
-
-    return () => {
-      clearTimeout(fallbackTimer);
-      unsubscribeAuth();
-    };
+    return () => clearTimeout(fallbackTimer);
   }, []);
 
-  // --- EFEITO 2: BUSCA DE DADOS ---
+  // --- EFEITO 2: BUSCA DE DADOS DIRETAMENTE DO SEU FIREBASE ---
   useEffect(() => {
-    if (isCanvasPreview && !user) return; // Aguarda a conexão no Preview
-
     let unsubRsvps = () => {};
     let unsubMessages = () => {};
 
     try {
-      unsubRsvps = onSnapshot(getCollRef("presencas"), (snapshot) => {
+      unsubRsvps = onSnapshot(collection(db, "presencas"), (snapshot) => {
         let dataList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         dataList.sort((a, b) => {
           const tA = a.data ? new Date(a.data).getTime() : 0;
@@ -153,9 +105,9 @@ export default function App() {
           return tB - tA;
         });
         setRsvps(dataList);
-      }, (error) => console.log("Aguardando permissões RSVPs..."));
+      }, (error) => console.error("Erro RSVPs (Verifique as regras do Firestore):", error));
 
-      unsubMessages = onSnapshot(getCollRef("mensagens"), (snapshot) => {
+      unsubMessages = onSnapshot(collection(db, "mensagens"), (snapshot) => {
         let dataList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         dataList.sort((a, b) => {
           const tA = a.data ? new Date(a.data).getTime() : 0;
@@ -163,7 +115,7 @@ export default function App() {
           return tB - tA;
         });
         setMessages(dataList);
-      }, (error) => console.log("Aguardando permissões Mensagens..."));
+      }, (error) => console.error("Erro Mensagens (Verifique as regras do Firestore):", error));
     } catch(err) {
       console.error("Erro ao configurar banco de dados", err);
     }
@@ -172,19 +124,13 @@ export default function App() {
       unsubRsvps();
       unsubMessages();
     };
-  }, [user]);
+  }, []);
 
-  // --- FUNÇÃO DA API DO GEMINI (CORRIGIDA PARA A VERCEL) ---
+  // --- FUNÇÃO DA API DO GEMINI (DIRETA E SEM COMPLICAÇÕES) ---
   const callGemini = async (prompt, systemInstruction, retries = 3, delay = 1000) => {
     try {
-      if (!isCanvasPreview && (!apiKey || apiKey === "")) {
-         return "⚠️ AVISO: A chave de API não foi carregada. Verifique as configurações na Vercel.";
-      }
-
-      // CORREÇÃO AQUI: A Vercel (chave pública) precisa usar o modelo gemini-1.5-flash.
-      const modelName = isCanvasPreview ? "gemini-2.5-flash-preview-09-2025" : "gemini-1.5-flash";
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+      // Usando o modelo flash oficial
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -251,15 +197,9 @@ export default function App() {
     window.open("https://maps.app.goo.gl/bdwsnZq7ipQEJhQL9", "_blank", "noopener,noreferrer");
   };
 
-  // --- AÇÕES DO FORMULÁRIO (BLINDADO CONTRA ERROS) ---
+  // --- AÇÕES DO FORMULÁRIO ---
   const handleRsvpSubmit = async (e) => {
     e.preventDefault();
-    
-    // Alerta protetor caso o banco ainda esteja a iniciar
-    if (isCanvasPreview && !user) {
-      alert("Aguardando conexão segura com o sistema. Tente novamente em 2 segundos.");
-      return;
-    }
 
     const nomeDigitado = rsvpForm.name.trim();
     if (!nomeDigitado) {
@@ -293,8 +233,8 @@ export default function App() {
       if (rsvpForm.child2Name.trim()) totalGuests++;
       if (rsvpForm.child3Name.trim()) totalGuests++;
       
-      // Salvar no Firebase
-      await addDoc(getCollRef("presencas"), {
+      // Salvar diretamente na coleção "presencas" do seu Firebase
+      await addDoc(collection(db, "presencas"), {
         ...rsvpForm,
         guests: totalGuests,
         data: new Date().toISOString()
@@ -312,21 +252,17 @@ export default function App() {
       setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
     } catch (error) {
       console.error("Erro ao salvar RSVP:", error);
-      alert("Houve um erro ao enviar a sua confirmação. A sua internet pode estar instável, tente novamente.");
+      alert("Houve um erro ao enviar a sua confirmação. Verificou as Regras do Firestore no Firebase?");
     }
   };
 
   const handleMessageSubmit = async () => {
-    if (isCanvasPreview && !user) {
-      alert("Aguardando conexão segura com o sistema.");
-      return;
-    }
     if (!currentMessage.author || !currentMessage.text) {
         alert("Por favor, preencha o seu nome e a mensagem.");
         return;
     }
     try {
-      await addDoc(getCollRef("mensagens"), {
+      await addDoc(collection(db, "mensagens"), {
         author: currentMessage.author,
         text: currentMessage.text,
         data: new Date().toISOString()
@@ -335,7 +271,7 @@ export default function App() {
       alert("A sua mensagem foi deixada no Livro de Ouro!");
     } catch (error) {
       console.error("Erro ao salvar mensagem:", error);
-      alert("Erro ao assinar o livro. Tente novamente.");
+      alert("Erro ao assinar o livro. Verificou as Regras do Firestore no Firebase?");
     }
   };
 
