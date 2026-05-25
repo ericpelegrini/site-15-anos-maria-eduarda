@@ -34,7 +34,7 @@ export default function App() {
   const fileInputRef = useRef(null);
   
   // ----------------------------------------------------------------------
-  // CHAVE DIRETA DA IA GEMINI
+  // CHAVE DIRETA DA IA GEMINI (OPÇÃO 2 - SEM ERROS NO VERCEL)
   // ----------------------------------------------------------------------
   const apiKey = "AIzaSyBA2NqIjykAr9C9T9XAqqMmmKhPhXx6dTc"; 
   
@@ -58,7 +58,7 @@ export default function App() {
   const [adminTab, setAdminTab] = useState('rsvps');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // --- EFEITO 1: CARREGAMENTO VISUAL ---
+  // --- EFEITO 1: CARREGAMENTO VISUAL TEMA DO BAILE ---
   useEffect(() => {
     document.title = "Aniversário 15 anos Maria Eduarda";
     document.documentElement.setAttribute('lang', 'pt-BR');
@@ -97,6 +97,7 @@ export default function App() {
     let unsubMessages = () => {};
 
     try {
+      // Como a regra do banco agora é "true", podemos ler os dados diretamente
       unsubRsvps = onSnapshot(collection(db, "presencas"), (snapshot) => {
         let dataList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         dataList.sort((a, b) => {
@@ -105,7 +106,7 @@ export default function App() {
           return tB - tA;
         });
         setRsvps(dataList);
-      }, (error) => console.error("Erro RSVPs (Verifique as regras do Firestore):", error));
+      }, (error) => console.error("Erro ao ler RSVPs:", error));
 
       unsubMessages = onSnapshot(collection(db, "mensagens"), (snapshot) => {
         let dataList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -115,7 +116,7 @@ export default function App() {
           return tB - tA;
         });
         setMessages(dataList);
-      }, (error) => console.error("Erro Mensagens (Verifique as regras do Firestore):", error));
+      }, (error) => console.error("Erro ao ler Mensagens:", error));
     } catch(err) {
       console.error("Erro ao configurar banco de dados", err);
     }
@@ -129,7 +130,7 @@ export default function App() {
   // --- FUNÇÃO DA API DO GEMINI (DIRETA E SEM COMPLICAÇÕES) ---
   const callGemini = async (prompt, systemInstruction, retries = 3, delay = 1000) => {
     try {
-      // Usando o modelo flash oficial
+      // Usando o modelo flash oficial para a chave pública
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -197,7 +198,7 @@ export default function App() {
     window.open("https://maps.app.goo.gl/bdwsnZq7ipQEJhQL9", "_blank", "noopener,noreferrer");
   };
 
-  // --- AÇÕES DO FORMULÁRIO ---
+  // --- AÇÕES DO FORMULÁRIO DE PRESENÇA ---
   const handleRsvpSubmit = async (e) => {
     e.preventDefault();
 
@@ -240,7 +241,7 @@ export default function App() {
         data: new Date().toISOString()
       });
       
-      // CONFIGURAR FEEDBACK VISUAL
+      // Feedback Visual de Sucesso
       setRsvpStatus(rsvpForm.attending); 
       if (rsvpForm.attending === 'yes') {
         setRsvpFeedbackMsg("A sua presença foi confirmada com sucesso, vemo-nos no baile!");
@@ -252,7 +253,7 @@ export default function App() {
       setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
     } catch (error) {
       console.error("Erro ao salvar RSVP:", error);
-      alert("Houve um erro ao enviar a sua confirmação. Verificou as Regras do Firestore no Firebase?");
+      alert("Houve um erro ao enviar a sua confirmação. Tente novamente mais tarde.");
     }
   };
 
@@ -271,7 +272,7 @@ export default function App() {
       alert("A sua mensagem foi deixada no Livro de Ouro!");
     } catch (error) {
       console.error("Erro ao salvar mensagem:", error);
-      alert("Erro ao assinar o livro. Verificou as Regras do Firestore no Firebase?");
+      alert("Erro ao assinar o livro. Tente novamente.");
     }
   };
 
