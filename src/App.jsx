@@ -7,7 +7,7 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 // --- CONFIGURAÇÃO DO FIREBASE (HÍBRIDA PARA PREVIEW E VERCEL) ---
 const isCanvasPreview = typeof __firebase_config !== 'undefined';
 
-const firebaseConfig = isCanvasPreview ? JSON.parse(__firebase_config) : {
+let parsedConfig = {
   apiKey: "AIzaSyAZ_JQZRNHMAoIXZ12Z3b9rTINf90t2ic1IAY",
   authDomain: "site-maria-eduarda-eaa2b.firebaseapp.com",
   projectId: "site-maria-eduarda-eaa2b",
@@ -16,19 +16,28 @@ const firebaseConfig = isCanvasPreview ? JSON.parse(__firebase_config) : {
   appId: "1:68809862594:web:234f9e5f7689fbebeb2cb"
 };
 
-const app = initializeApp(firebaseConfig);
+// Evita o travamento (Tela Vermelha "Algo deu errado") ao processar as configurações no ambiente de testes
+if (isCanvasPreview) {
+  try {
+    parsedConfig = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+  } catch (error) {
+    console.error("Erro ao analisar configurações do Firebase:", error);
+  }
+}
+
+const app = initializeApp(parsedConfig);
 const db = getFirestore(app);
-const auth = getAuth(app); // Inicializa a autenticação sempre
+const auth = getAuth(app);
 
-// Evita o erro de segmentos inválidos limpando o ID do App
-const appId = typeof __app_id !== 'undefined' ? __app_id.replace(/\//g, '_') : 'default-app-id';
+// Sanitiza o ID do aplicativo de forma segura
+const safeAppId = typeof __app_id !== 'undefined' ? String(__app_id).replace(/\//g, '_') : 'default-app-id';
 
-// Função inteligente para rotear os dados corretamente dependendo de onde o site está a rodar
+// Função inteligente que direciona os dados para o lugar certo (Preview vs Vercel)
 const getCollRef = (name) => {
   if (isCanvasPreview) {
-    return collection(db, 'artifacts', appId, 'public', 'data', name);
+    return collection(db, 'artifacts', safeAppId, 'public', 'data', name);
   }
-  return collection(db, name); // Usa a raiz normal quando publicado na Vercel
+  return collection(db, name);
 };
 
 export default function App() {
@@ -44,12 +53,17 @@ export default function App() {
   const [rsvpForm, setRsvpForm] = useState({ 
     name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' 
   });
-  const [rsvpStatus, setRsvpStatus] = useState(null); // 'yes' | 'no' | null
+  const [rsvpStatus, setRsvpStatus] = useState(null);
   const [rsvpFeedbackMsg, setRsvpFeedbackMsg] = useState('');
   
   const fileInputRef = useRef(null);
   
-  // --- ESTADOS DA INTELIGÊNCIA ARTIFICIAL (GEMINI) ---
+  // ----------------------------------------------------------------------
+  // CONFIGURAÇÃO DA CHAVE DE IA
+  // Importante: Quando copiar este código para o seu VS Code, substitua 
+  // a linha 'const apiKey = "";' abaixo pela sua chave diretamente:
+  // const apiKey = "AIzaSyBA2NqIjykAr9C9T9XAqqMmmKhPhXx6dTc";
+  // ----------------------------------------------------------------------
   const apiKey = ""; 
   
   const [currentMessage, setCurrentMessage] = useState({ author: '', text: '' });
@@ -67,7 +81,6 @@ export default function App() {
   const [toastSuggestion, setToastSuggestion] = useState('');
   const [isGeneratingToast, setIsGeneratingToast] = useState(false);
 
-  // --- ESTADOS DA ÁREA RESTRITA E CARREGAMENTO ---
   const [isAdmin, setIsAdmin] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [adminTab, setAdminTab] = useState('rsvps');
@@ -103,7 +116,6 @@ export default function App() {
       setIsLoaded(true);
     }
 
-    // Inicializa a autenticação (REGRA 3: AUTH BEFORE QUERIES)
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -112,7 +124,7 @@ export default function App() {
           await signInAnonymously(auth);
         }
       } catch (error) {
-        console.error("Erro de Autenticação:", error);
+        console.error("Aviso de Autenticação Silenciosa:", error);
       }
     };
     initAuth();
@@ -127,21 +139,36 @@ export default function App() {
     };
   }, []);
 
-  // --- EFEITO 2: BUSCA DE DADOS (APENAS APÓS AUTENTICAÇÃO) ---
+  // --- EFEITO 2: BUSCA DE DADOS ---
   useEffect(() => {
-    if (!user) return; // Aguarda a autenticação concluir para evitar erros de permissão
+    if (isCanvasPreview && !user) return; // Aguarda a conexão no Preview
 
-    const unsubRsvps = onSnapshot(getCollRef("presencas"), (snapshot) => {
-      let dataList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      dataList.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
-      setRsvps(dataList);
-    }, (error) => console.error("Erro RSVPs:", error));
+    let unsubRsvps = () => {};
+    let unsubMessages = () => {};
 
-    const unsubMessages = onSnapshot(getCollRef("mensagens"), (snapshot) => {
-      let dataList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      dataList.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
-      setMessages(dataList);
-    }, (error) => console.error("Erro Mensagens:", error));
+    try {
+      unsubRsvps = onSnapshot(getCollRef("presencas"), (snapshot) => {
+        let dataList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        dataList.sort((a, b) => {
+          const tA = a.data ? new Date(a.data).getTime() : 0;
+          const tB = b.data ? new Date(b.data).getTime() : 0;
+          return tB - tA;
+        });
+        setRsvps(dataList);
+      }, (error) => console.log("Aguardando permissões RSVPs..."));
+
+      unsubMessages = onSnapshot(getCollRef("mensagens"), (snapshot) => {
+        let dataList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        dataList.sort((a, b) => {
+          const tA = a.data ? new Date(a.data).getTime() : 0;
+          const tB = b.data ? new Date(b.data).getTime() : 0;
+          return tB - tA;
+        });
+        setMessages(dataList);
+      }, (error) => console.log("Aguardando permissões Mensagens..."));
+    } catch(err) {
+      console.error("Erro ao configurar banco de dados", err);
+    }
 
     return () => {
       unsubRsvps();
@@ -149,9 +176,13 @@ export default function App() {
     };
   }, [user]);
 
-  // --- FUNÇÃO DA API DO GEMINI 100% BLINDADA ---
-  const callGemini = async (prompt, systemInstruction, retries = 5, delay = 1000) => {
+  // --- FUNÇÃO DA API DO GEMINI (RODA EM OCULTO) ---
+  const callGemini = async (prompt, systemInstruction, retries = 3, delay = 1000) => {
     try {
+      if (!apiKey || apiKey === "") {
+         return "⚠️ AVISO: A chave de API não foi carregada. Verifique as configurações na Vercel.";
+      }
+
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -166,12 +197,12 @@ export default function App() {
       
       return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     } catch (error) {
-      console.error("Erro ao chamar o Gemini:", error);
+      console.error("Erro interno da IA:", error);
       if (retries > 0) {
         await new Promise(resolve => setTimeout(resolve, delay));
         return callGemini(prompt, systemInstruction, retries - 1, delay * 2);
       }
-      return 'Ops, a magia do baile falhou por um instante. Tente novamente mais tarde!';
+      return 'A magia do baile falhou por um instante. Tente novamente mais tarde!';
     }
   };
 
@@ -219,11 +250,13 @@ export default function App() {
     window.open("https://maps.app.goo.gl/bdwsnZq7ipQEJhQL9", "_blank", "noopener,noreferrer");
   };
 
-  // --- AÇÕES DO FORMULÁRIO E FIREBASE ---
+  // --- AÇÕES DO FORMULÁRIO (BLINDADO CONTRA ERROS) ---
   const handleRsvpSubmit = async (e) => {
     e.preventDefault();
-    if (!user) {
-      alert("Aguarde a conexão com o servidor ser estabelecida.");
+    
+    // Alerta protetor caso o banco ainda esteja a iniciar
+    if (isCanvasPreview && !user) {
+      alert("Aguardando conexão segura com o sistema. Tente novamente em 2 segundos.");
       return;
     }
 
@@ -278,12 +311,15 @@ export default function App() {
       setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
     } catch (error) {
       console.error("Erro ao salvar RSVP:", error);
-      alert("Houve um erro ao enviar a sua confirmação. Verifique a sua ligação e tente novamente.");
+      alert("Houve um erro ao enviar a sua confirmação. A sua internet pode estar instável, tente novamente.");
     }
   };
 
   const handleMessageSubmit = async () => {
-    if (!user) return;
+    if (isCanvasPreview && !user) {
+      alert("Aguardando conexão segura com o sistema.");
+      return;
+    }
     if (!currentMessage.author || !currentMessage.text) {
         alert("Por favor, preencha o seu nome e a mensagem.");
         return;
@@ -729,10 +765,7 @@ export default function App() {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                     {photos.map(photo => (
                       <div key={photo.id} className="aspect-square overflow-hidden rounded-sm border border-[#C7A153]/30 group relative bg-black">
-                        {photo.type === 'video' ? <video src={photo.url} className="w-full h-full object-cover" autoPlay muted loop playsInline /> : <img src={photo.url} alt="Festa" className="w-full h-full object-cover" />}
-                        <div className="absolute inset-0 bg-[#110103]/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                          <button onClick={() => handleDownloadPhoto(photo.url, photo.type === 'video' ? `video_${photo.id}.mp4` : `foto_${photo.id}.jpg`)} className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[#FFF0B3] border border-[#C7A153] px-3 py-2 bg-[#C7A153]/10"><Download size={14} /> Baixar</button>
-                        </div>
+                        {photo.type === 'video' ? <video src={photo.url} className="w-full h-32 object-cover" autoPlay muted loop playsInline /> : <img src={photo.url} alt="Festa" className="w-full h-full object-cover" />}
                       </div>
                     ))}
                   </div>
