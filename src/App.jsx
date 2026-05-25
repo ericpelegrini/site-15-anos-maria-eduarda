@@ -59,10 +59,10 @@ export default function App() {
   const fileInputRef = useRef(null);
   
   // ----------------------------------------------------------------------
-  // CONFIGURAÇÃO DA CHAVE DE IA
-  // Substitua a linha 'const apiKey = "";' abaixo pela sua chave diretamente
+  // CONFIGURAÇÃO DA CHAVE DE IA - MODO INTELIGENTE
+  // No Preview usa chave vazia. Na Vercel, usa a chave que você gerou.
   // ----------------------------------------------------------------------
-  const apiKey = "AIzaSyBA2NqIjykAr9C9T9XAqqMmmKhPhXx6dTc"; 
+  const apiKey = isCanvasPreview ? "" : "AIzaSyBA2NqIjykAr9C9T9XAqqMmmKhPhXx6dTc"; 
   
   const [currentMessage, setCurrentMessage] = useState({ author: '', text: '' });
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -174,14 +174,17 @@ export default function App() {
     };
   }, [user]);
 
-  // --- FUNÇÃO DA API DO GEMINI (RODA EM OCULTO) ---
+  // --- FUNÇÃO DA API DO GEMINI (CORRIGIDA PARA A VERCEL) ---
   const callGemini = async (prompt, systemInstruction, retries = 3, delay = 1000) => {
     try {
-      if (!apiKey || apiKey === "") {
+      if (!isCanvasPreview && (!apiKey || apiKey === "")) {
          return "⚠️ AVISO: A chave de API não foi carregada. Verifique as configurações na Vercel.";
       }
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+      // CORREÇÃO AQUI: A Vercel (chave pública) precisa usar o modelo gemini-1.5-flash.
+      const modelName = isCanvasPreview ? "gemini-2.5-flash-preview-09-2025" : "gemini-1.5-flash";
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -200,7 +203,7 @@ export default function App() {
         await new Promise(resolve => setTimeout(resolve, delay));
         return callGemini(prompt, systemInstruction, retries - 1, delay * 2);
       }
-      return 'A magia do baile falhou por um instante. Tente novamente mais tarde!';
+      return 'Ops, a magia do baile falhou por um instante. Tente novamente mais tarde!';
     }
   };
 
@@ -764,6 +767,9 @@ export default function App() {
                     {photos.map(photo => (
                       <div key={photo.id} className="aspect-square overflow-hidden rounded-sm border border-[#C7A153]/30 group relative bg-black">
                         {photo.type === 'video' ? <video src={photo.url} className="w-full h-32 object-cover" autoPlay muted loop playsInline /> : <img src={photo.url} alt="Festa" className="w-full h-full object-cover" />}
+                        <div className="absolute inset-0 bg-[#110103]/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                          <button onClick={() => handleDownloadPhoto(photo.url, photo.type === 'video' ? `video_${photo.id}.mp4` : `foto_${photo.id}.jpg`)} className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[#FFF0B3] border border-[#C7A153] px-3 py-2 bg-[#C7A153]/10"><Download size={14} /> Baixar</button>
+                        </div>
                       </div>
                     ))}
                   </div>
