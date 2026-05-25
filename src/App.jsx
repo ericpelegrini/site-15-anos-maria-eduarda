@@ -60,11 +60,9 @@ export default function App() {
   
   // ----------------------------------------------------------------------
   // CONFIGURAÇÃO DA CHAVE DE IA
-  // Importante: Quando copiar este código para o seu VS Code, substitua 
-  // a linha 'const apiKey = "";' abaixo pela sua chave diretamente:
-  // const apiKey = "AIzaSyBA2NqIjykAr9C9T9XAqqMmmKhPhXx6dTc";
+  // Substitua a linha 'const apiKey = "";' abaixo pela sua chave diretamente
   // ----------------------------------------------------------------------
-  const apiKey = ""; 
+  const apiKey = "AIzaSyBA2NqIjykAr9C9T9XAqqMmmKhPhXx6dTc"; 
   
   const [currentMessage, setCurrentMessage] = useState({ author: '', text: '' });
   const [isEnhancing, setIsEnhancing] = useState(false);
