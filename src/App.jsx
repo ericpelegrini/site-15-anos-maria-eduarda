@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Gift, CheckCircle, MapPin, Calendar, Clock, Info, Upload, Heart, Wine, Wand2, Loader2, MessageSquareText, Lock, Download, Users, LogOut, XCircle } from 'lucide-react';
+import { Camera, CheckCircle, MapPin, Calendar, Clock, Upload, Heart, Wine, MessageSquareText, Lock, Download, Users, LogOut, XCircle } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, onSnapshot } from "firebase/firestore";
 
@@ -33,32 +33,15 @@ export default function App() {
   
   const fileInputRef = useRef(null);
   
-  // ----------------------------------------------------------------------
-  // CHAVE DIRETA DA IA GEMINI
-  // ----------------------------------------------------------------------
-  const apiKey = "AIzaSyBA2NqIjykAr9C9T9XAqqMmmKhPhXx6dTc"; 
-  
+  // --- ESTADOS DO LIVRO DE OURO ---
   const [currentMessage, setCurrentMessage] = useState({ author: '', text: '' });
-  const [isEnhancing, setIsEnhancing] = useState(false);
-  
-  const [maskStyle, setMaskStyle] = useState('');
-  const [maskSuggestion, setMaskSuggestion] = useState('');
-  const [isSuggestingMask, setIsSuggestingMask] = useState(false);
-
-  const [giftQuery, setGiftQuery] = useState('');
-  const [giftSuggestion, setGiftSuggestion] = useState('');
-  const [isSuggestingGift, setIsSuggestingGift] = useState(false);
-
-  const [toastRelation, setToastRelation] = useState('');
-  const [toastSuggestion, setToastSuggestion] = useState('');
-  const [isGeneratingToast, setIsGeneratingToast] = useState(false);
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [adminTab, setAdminTab] = useState('rsvps');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // --- EFEITO 1: CARREGAMENTO VISUAL ---
+  // --- EFEITO 1: CARREGAMENTO VISUAL TEMA DO BAILE ---
   useEffect(() => {
     document.title = "Aniversário 15 anos Maria Eduarda";
     document.documentElement.setAttribute('lang', 'pt-BR');
@@ -105,7 +88,7 @@ export default function App() {
           return tB - tA;
         });
         setRsvps(dataList);
-      }, (error) => console.error("Erro RSVPs (Verifique as regras do Firestore):", error));
+      }, (error) => console.error("Erro ao ler RSVPs:", error));
 
       unsubMessages = onSnapshot(collection(db, "mensagens"), (snapshot) => {
         let dataList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -115,7 +98,7 @@ export default function App() {
           return tB - tA;
         });
         setMessages(dataList);
-      }, (error) => console.error("Erro Mensagens (Verifique as regras do Firestore):", error));
+      }, (error) => console.error("Erro ao ler Mensagens:", error));
     } catch(err) {
       console.error("Erro ao configurar banco de dados", err);
     }
@@ -126,70 +109,6 @@ export default function App() {
     };
   }, []);
 
-  // --- FUNÇÃO DA API DO GEMINI (DIRETA E SEM COMPLICAÇÕES) ---
-  const callGemini = async (prompt, systemInstruction, retries = 3, delay = 1000) => {
-    try {
-      // Usando o modelo flash oficial
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          systemInstruction: { parts: [{ text: systemInstruction }] }
-        })
-      });
-      
-      const data = await response.json();
-      if (data.error) throw new Error(data.error.message);
-      
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    } catch (error) {
-      console.error("Erro interno da IA:", error);
-      if (retries > 0) {
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return callGemini(prompt, systemInstruction, retries - 1, delay * 2);
-      }
-      return 'Ops, a magia do baile falhou por um instante. Tente novamente mais tarde!';
-    }
-  };
-
-  // --- AÇÕES DA INTELIGÊNCIA ARTIFICIAL ---
-  const handleEnhanceMessage = async () => {
-    if (!currentMessage.text) return;
-    setIsEnhancing(true);
-    const systemPrompt = "Você é um poeta de época, mestre de cerimônias de um baile de máscaras luxuoso. O utilizador escreveu uma mensagem de feliz aniversário para a Maria Eduarda, que está a fazer 15 anos. Reescreva a mensagem de forma elegante, poética, sofisticada e com um toque de mistério. Mantenha o sentimento original. Seja breve (máximo de 3 frases curtas). Responda APENAS com a mensagem reescrita sem aspas.";
-    const enhanced = await callGemini(`Mensagem original: "${currentMessage.text}"`, systemPrompt);
-    if (enhanced) setCurrentMessage({ ...currentMessage, text: enhanced.trim() });
-    setIsEnhancing(false);
-  };
-
-  const handleMaskSuggestion = async () => {
-    if (!maskStyle) return;
-    setIsSuggestingMask(true);
-    const systemPrompt = "Você é um figurinista de luxo especialista EXCLUSIVAMENTE em Bailes de Máscaras Venezianos. O convidado de uma festa de 15 anos descreveu o traje que vai usar. Sugira um tipo, formato e cor de máscara que combine perfeitamente. REGRA ABSOLUTA: A máscara sugerida DEVE OBRIGATORIAMENTE ser do estilo Veneziano Clássico. JAMAIS sugira máscaras de personagens de filmes, heróis ou cultura pop. Dê um nome misterioso para a máscara veneziana. Seja sofisticado. Máximo de 3 frases. Responda APENAS com a sugestão.";
-    const suggestion = await callGemini(`O meu estilo/traje: "${maskStyle}"`, systemPrompt);
-    if (suggestion) setMaskSuggestion(suggestion.replace(/"/g, '').trim());
-    setIsSuggestingMask(false);
-  };
-
-  const handleGiftSuggestion = async () => {
-    if (!giftQuery) return;
-    setIsSuggestingGift(true);
-    const systemPrompt = "Você é um assistente pessoal de compras para os convidados dos 15 anos da Maria Eduarda. A lista de preferências da aniversariante inclui: Roupas tam M (Calças 38, Blusas, Vestidos); Calçado tam 37; Acessórios em Prata ou Dourado (Anel tam 16, Malas pequenas); Cosméticos (Perfumes e Cremes suaves, produtos de cabelo, Maquilhagem de qualquer marca exceto Max Love); Cores favoritas: Vermelho, Rosa Bebé, Preto e Branco. O utilizador dirá quem ele é ou qual o orçamento dele. ATENÇÃO: Caso sugira algum valor, utilize SEMPRE a moeda Real (R$). Com base na lista de preferências da Duda, sugira UMA ideia de presente específica, criativa e amável. Máximo de 3 frases curtas. Responda de forma empolgante APENAS com a sugestão.";
-    const suggestion = await callGemini(`O meu perfil/orçamento: "${giftQuery}"`, systemPrompt);
-    if (suggestion) setGiftSuggestion(suggestion.replace(/"/g, '').trim());
-    setIsSuggestingGift(false);
-  };
-
-  const handleGenerateToast = async () => {
-    if (!toastRelation) return;
-    setIsGeneratingToast(true);
-    const systemPrompt = "Você é um mestre de cerimónias experiente de um Baile de Máscaras. O utilizador vai discursar nos 15 anos da Maria Eduarda e dirá qual é a relação que tem com ela. Escreva um brinde (discurso) muito curto (máximo de 3 a 4 frases), emocionante e sofisticado para ser lido com uma taça na mão. Responda APENAS com o texto do discurso, sem aspas.";
-    const suggestion = await callGemini(`A minha relação com a Duda: "${toastRelation}"`, systemPrompt);
-    if (suggestion) setToastSuggestion(suggestion.replace(/"/g, '').trim());
-    setIsGeneratingToast(false);
-  };
-
   // --- ABERTURA FORÇADA E SEGURA DO MAPA ---
   const handleMapOpen = (e) => {
     e.preventDefault();
@@ -197,7 +116,7 @@ export default function App() {
     window.open("https://maps.app.goo.gl/bdwsnZq7ipQEJhQL9", "_blank", "noopener,noreferrer");
   };
 
-  // --- AÇÕES DO FORMULÁRIO ---
+  // --- AÇÕES DO FORMULÁRIO DE PRESENÇA ---
   const handleRsvpSubmit = async (e) => {
     e.preventDefault();
 
@@ -240,7 +159,7 @@ export default function App() {
         data: new Date().toISOString()
       });
       
-      // CONFIGURAR FEEDBACK VISUAL
+      // Feedback Visual de Sucesso
       setRsvpStatus(rsvpForm.attending); 
       if (rsvpForm.attending === 'yes') {
         setRsvpFeedbackMsg("A sua presença foi confirmada com sucesso, vemo-nos no baile!");
@@ -252,7 +171,7 @@ export default function App() {
       setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
     } catch (error) {
       console.error("Erro ao salvar RSVP:", error);
-      alert("Houve um erro ao enviar a sua confirmação. Verificou as Regras do Firestore no Firebase?");
+      alert("Houve um erro ao enviar a sua confirmação. Tente novamente mais tarde.");
     }
   };
 
@@ -271,7 +190,7 @@ export default function App() {
       alert("A sua mensagem foi deixada no Livro de Ouro!");
     } catch (error) {
       console.error("Erro ao salvar mensagem:", error);
-      alert("Erro ao assinar o livro. Verificou as Regras do Firestore no Firebase?");
+      alert("Erro ao assinar o livro. Tente novamente.");
     }
   };
 
@@ -534,30 +453,8 @@ export default function App() {
                 <div className="flex flex-col items-center gap-4 pt-4">
                   <Wine className="text-[#C7A153]" strokeWidth={1.5} size={32} />
                   <p className="font-sans text-[#FFF0B3] font-medium text-sm leading-loose max-w-lg opacity-95">
-                    Na festa serão servidos sumos, refrigerantes e águas, mas sinta-se à vontade para levar a sua geleira com a sua bebida alcoólica preferida.
+                    Na festa serão servidos sucos, refrigerantes e águas, mas sinta-se à vontade para levar a sua geleira com a sua bebida alcoólica preferida.
                   </p>
-                </div>
-
-                {/* --- IA CONSULTOR DE MÁSCARAS --- */}
-                <div className="mt-12 pt-12 border-t border-[#C7A153]/30 flex flex-col items-center">
-                  <h4 className="text-xl font-serif italic text-[#FFF0B3] mb-4 flex items-center gap-3 font-semibold">
-                    <Wand2 size={24} className="text-[#C7A153]" /> Consultor de Máscaras ✨
-                  </h4>
-                  <p className="font-sans text-[#FFF0B3] font-medium text-sm mb-6 max-w-md opacity-95">
-                    Na dúvida sobre qual máscara usar? Descreva o estilo da sua roupa e a nossa Inteligência Artificial vai sugerir a máscara veneziana perfeita para a noite.
-                  </p>
-                  <div className="flex flex-col sm:flex-row w-full max-w-lg gap-4 relative">
-                    <input type="text" value={maskStyle} onChange={(e) => setMaskStyle(e.target.value)} placeholder="Ex: Vestido comprido vinho..." className="flex-1 input-elegant text-sm text-center sm:text-left px-2" />
-                    <button onClick={handleMaskSuggestion} disabled={isSuggestingMask || !maskStyle} className="border border-[#C7A153] text-[#FFF0B3] px-6 py-3 rounded-sm transition-all hover:bg-[#C7A153]/20 disabled:opacity-50 flex items-center justify-center gap-2 text-xs uppercase tracking-widest min-w-[140px] font-bold">
-                      {isSuggestingMask ? <Loader2 size={16} className="animate-spin" /> : 'Sugerir'}
-                    </button>
-                  </div>
-                  {maskSuggestion && (
-                    <div className="mt-8 p-6 glass-panel rounded-sm w-full max-w-lg animate-fade-in text-center sm:text-left relative">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#C7A153] to-transparent"></div>
-                      <p className="font-serif text-[#FFF0B3] font-medium leading-relaxed italic text-sm md:text-base">"{maskSuggestion}"</p>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -601,29 +498,6 @@ export default function App() {
                     <p className="text-xs font-bold text-[#C7A153] uppercase tracking-widest">Cores Favoritas: Vermelho, Rosa Bebé, Preto e Branco.</p>
                   </div>
                 </div>
-
-                {/* --- IA ASSISTENTE DE PRESENTES --- */}
-                <div className="mt-12 pt-12 border-t border-[#C7A153]/30 flex flex-col items-center">
-                  <h4 className="text-xl font-serif italic text-[#FFF0B3] mb-4 flex items-center gap-3 font-semibold">
-                    <Gift size={24} className="text-[#C7A153]" /> Assistente de Presentes
-                  </h4>
-                  <p className="font-sans text-[#FFF0B3] font-medium text-sm mb-6 max-w-md opacity-95 text-center">
-                    Ainda com dúvidas do que oferecer? Descreva o seu orçamento ou quem é para a Duda, e a nossa IA encontra a opção ideal com base na lista de preferências!
-                  </p>
-                  <div className="flex flex-col sm:flex-row w-full max-w-lg gap-4 relative">
-                    <input type="text" value={giftQuery} onChange={(e) => setGiftQuery(e.target.value)} placeholder="Ex: Sou a madrinha e posso gastar R$ 150..." className="flex-1 input-elegant text-sm text-center sm:text-left px-2" />
-                    <button onClick={handleGiftSuggestion} disabled={isSuggestingGift || !giftQuery} className="border border-[#C7A153] text-[#FFF0B3] px-6 py-3 rounded-sm transition-all hover:bg-[#C7A153]/20 disabled:opacity-50 flex items-center justify-center gap-2 text-xs uppercase tracking-widest min-w-[140px] font-bold">
-                      {isSuggestingGift ? <Loader2 size={16} className="animate-spin" /> : 'Descobrir ✨'}
-                    </button>
-                  </div>
-                  {giftSuggestion && (
-                    <div className="mt-8 p-6 glass-panel rounded-sm w-full max-w-lg animate-fade-in text-center sm:text-left relative">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#C7A153] to-transparent"></div>
-                      <p className="font-serif text-[#FFF0B3] font-medium leading-relaxed italic text-sm md:text-base">"{giftSuggestion}"</p>
-                    </div>
-                  )}
-                </div>
-
               </div>
             )}
 
@@ -713,7 +587,7 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB: LIVRO DE OURO E IA */}
+            {/* TAB: LIVRO DE OURO SEM IA */}
             {activeTab === 'recados' && (
               <div className="animate-fade-in space-y-10">
                 <div className="text-center space-y-4">
@@ -726,37 +600,11 @@ export default function App() {
                     <input type="text" placeholder="O seu Nome" value={currentMessage.author} onChange={(e) => setCurrentMessage({...currentMessage, author: e.target.value})} className="w-full input-elegant text-sm font-medium px-2" />
                     <textarea placeholder="Escreva a sua mensagem simples aqui..." value={currentMessage.text} onChange={(e) => setCurrentMessage({...currentMessage, text: e.target.value})} className="w-full input-elegant text-sm font-medium h-24 resize-none px-2 custom-scrollbar" />
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-4 relative z-10 pt-2">
-                    <button onClick={handleEnhanceMessage} disabled={isEnhancing || !currentMessage.text} className="flex-1 border border-[#C7A153] text-[#FFF0B3] bg-[#C7A153]/10 hover:bg-[#C7A153]/30 font-bold py-4 rounded-sm transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50">
-                      {isEnhancing ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />} Deixar Poético ✨
-                    </button>
-                    <button onClick={handleMessageSubmit} disabled={!currentMessage.author || !currentMessage.text} className="flex-1 bg-gradient-to-r from-[#C7A153]/90 to-[#C7A153]/60 hover:from-[#C7A153] hover:to-[#C7A153]/80 text-[#110103] font-bold py-4 rounded-sm transition-all text-xs uppercase tracking-widest disabled:opacity-50">
+                  <div className="pt-2 relative z-10 flex justify-center">
+                    <button onClick={handleMessageSubmit} disabled={!currentMessage.author || !currentMessage.text} className="w-full bg-gradient-to-r from-[#C7A153]/90 to-[#C7A153]/60 hover:from-[#C7A153] hover:to-[#C7A153]/80 text-[#110103] font-bold py-4 rounded-sm transition-all text-xs uppercase tracking-widest disabled:opacity-50 shadow-[0_0_15px_rgba(199,161,83,0.2)]">
                       Assinar Livro
                     </button>
                   </div>
-                  <p className="text-[11px] text-center text-[#C7A153] italic mt-4 font-medium">✨ Dica Mágica: Escreva algo simples e clique em "Deixar Poético" para a nossa IA transformar as suas palavras num texto digno da realeza!</p>
-                </div>
-
-                {/* --- IA GERADOR DE BRINDES / DISCURSOS --- */}
-                <div className="mt-12 pt-12 border-t border-[#C7A153]/30 flex flex-col items-center">
-                  <h4 className="text-xl font-serif italic text-[#FFF0B3] mb-4 flex items-center gap-3 font-semibold">
-                    <Wine size={24} className="text-[#C7A153]" /> Mestre de Cerimónias
-                  </h4>
-                  <p className="font-sans text-[#FFF0B3] font-medium text-sm mb-6 max-w-md opacity-95 text-center">
-                    Vai erguer a sua taça durante a festa e está sem inspiração? Diga qual é a sua relação com a aniversariante e a IA escreverá um brinde emocionante para ler no momento!
-                  </p>
-                  <div className="flex flex-col sm:flex-row w-full max-w-lg gap-4 relative">
-                    <input type="text" value={toastRelation} onChange={(e) => setToastRelation(e.target.value)} placeholder="Ex: Sou o padrinho babão..." className="flex-1 input-elegant text-sm text-center sm:text-left px-2" />
-                    <button onClick={handleGenerateToast} disabled={isGeneratingToast || !toastRelation} className="border border-[#C7A153] text-[#FFF0B3] px-6 py-3 rounded-sm transition-all hover:bg-[#C7A153]/20 disabled:opacity-50 flex items-center justify-center gap-2 text-xs uppercase tracking-widest min-w-[140px] font-bold">
-                      {isGeneratingToast ? <Loader2 size={16} className="animate-spin" /> : 'Escrever Brinde ✨'}
-                    </button>
-                  </div>
-                  {toastSuggestion && (
-                    <div className="mt-8 p-6 glass-panel rounded-sm w-full max-w-lg animate-fade-in text-center sm:text-left relative">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#C7A153] to-transparent"></div>
-                      <p className="font-serif text-[#FFF0B3] font-medium leading-relaxed italic text-sm md:text-base">"{toastSuggestion}"</p>
-                    </div>
-                  )}
                 </div>
 
                 <div className="space-y-6 mt-12">
