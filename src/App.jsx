@@ -34,7 +34,7 @@ export default function App() {
   const fileInputRef = useRef(null);
   
   // ----------------------------------------------------------------------
-  // CHAVE DIRETA DA IA GEMINI (OPÇÃO 2 - SEM ERROS NO VERCEL)
+  // CHAVE DIRETA DA IA GEMINI
   // ----------------------------------------------------------------------
   const apiKey = "AIzaSyBA2NqIjykAr9C9T9XAqqMmmKhPhXx6dTc"; 
   
@@ -58,7 +58,7 @@ export default function App() {
   const [adminTab, setAdminTab] = useState('rsvps');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // --- EFEITO 1: CARREGAMENTO VISUAL TEMA DO BAILE ---
+  // --- EFEITO 1: CARREGAMENTO VISUAL ---
   useEffect(() => {
     document.title = "Aniversário 15 anos Maria Eduarda";
     document.documentElement.setAttribute('lang', 'pt-BR');
@@ -97,7 +97,6 @@ export default function App() {
     let unsubMessages = () => {};
 
     try {
-      // Como a regra do banco agora é "true", podemos ler os dados diretamente
       unsubRsvps = onSnapshot(collection(db, "presencas"), (snapshot) => {
         let dataList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         dataList.sort((a, b) => {
@@ -106,7 +105,7 @@ export default function App() {
           return tB - tA;
         });
         setRsvps(dataList);
-      }, (error) => console.error("Erro ao ler RSVPs:", error));
+      }, (error) => console.error("Erro RSVPs (Verifique as regras do Firestore):", error));
 
       unsubMessages = onSnapshot(collection(db, "mensagens"), (snapshot) => {
         let dataList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -116,7 +115,7 @@ export default function App() {
           return tB - tA;
         });
         setMessages(dataList);
-      }, (error) => console.error("Erro ao ler Mensagens:", error));
+      }, (error) => console.error("Erro Mensagens (Verifique as regras do Firestore):", error));
     } catch(err) {
       console.error("Erro ao configurar banco de dados", err);
     }
@@ -130,7 +129,7 @@ export default function App() {
   // --- FUNÇÃO DA API DO GEMINI (DIRETA E SEM COMPLICAÇÕES) ---
   const callGemini = async (prompt, systemInstruction, retries = 3, delay = 1000) => {
     try {
-      // Usando o modelo flash oficial para a chave pública
+      // Usando o modelo flash oficial
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -198,7 +197,7 @@ export default function App() {
     window.open("https://maps.app.goo.gl/bdwsnZq7ipQEJhQL9", "_blank", "noopener,noreferrer");
   };
 
-  // --- AÇÕES DO FORMULÁRIO DE PRESENÇA ---
+  // --- AÇÕES DO FORMULÁRIO ---
   const handleRsvpSubmit = async (e) => {
     e.preventDefault();
 
@@ -241,7 +240,7 @@ export default function App() {
         data: new Date().toISOString()
       });
       
-      // Feedback Visual de Sucesso
+      // CONFIGURAR FEEDBACK VISUAL
       setRsvpStatus(rsvpForm.attending); 
       if (rsvpForm.attending === 'yes') {
         setRsvpFeedbackMsg("A sua presença foi confirmada com sucesso, vemo-nos no baile!");
@@ -253,7 +252,7 @@ export default function App() {
       setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
     } catch (error) {
       console.error("Erro ao salvar RSVP:", error);
-      alert("Houve um erro ao enviar a sua confirmação. Tente novamente mais tarde.");
+      alert("Houve um erro ao enviar a sua confirmação. Verificou as Regras do Firestore no Firebase?");
     }
   };
 
@@ -272,7 +271,7 @@ export default function App() {
       alert("A sua mensagem foi deixada no Livro de Ouro!");
     } catch (error) {
       console.error("Erro ao salvar mensagem:", error);
-      alert("Erro ao assinar o livro. Tente novamente.");
+      alert("Erro ao assinar o livro. Verificou as Regras do Firestore no Firebase?");
     }
   };
 
@@ -489,7 +488,7 @@ export default function App() {
                 <div className="space-y-6">
                   <h3 className="text-3xl md:text-4xl font-serif italic gold-gradient-text font-semibold">Venham comemorar este dia especial comigo.</h3>
                   <p className="text-[#FFF0B3] font-sans font-medium text-sm md:text-base max-w-xl mx-auto leading-loose opacity-95">
-                    Será muito divertido, separe uma roupa confortável, porém elegante, nada de calças de ganga neste dia tão importante.<br/><br/>
+                    Será muito divertido. Separe uma roupa confortável, porém elegante, nada de calça jeans neste dia tão importante.<br/><br/>
                     <span className="italic">Não é obrigatório, mas seria interessante se for com uma máscara.</span>
                   </p>
                 </div>
@@ -575,7 +574,7 @@ export default function App() {
                     <h4 className="text-sm font-bold uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center">Roupa & Sapatos</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-sm font-medium text-[#FFF0B3]">
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Camisola</span> <span>Tam M</span></div>
-                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Calções/Calças</span> <span>Tam M (Ganga 38)</span></div>
+                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Calções/Calças</span> <span>Tam M (Jeans 38)</span></div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Vestido</span> <span>Tam M</span></div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Sapatos/Ténis</span> <span>Tam 37</span></div>
                     </div>
@@ -583,7 +582,7 @@ export default function App() {
                   <div className="relative">
                     <h4 className="text-sm font-bold uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center">Acessórios</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-sm font-medium text-[#FFF0B3]">
-                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Brincos / Fio / Pulseira</span> <span>Prata ou Dourado</span></div>
+                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Brincos / Corrente / Pulseira</span> <span>Prata ou Dourado</span></div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Anel</span> <span>Tam 16</span></div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Mala</span> <span>Pequena</span></div>
                     </div>
