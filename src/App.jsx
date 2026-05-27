@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, CheckCircle, MapPin, Calendar, Clock, Upload, Heart, Wine, MessageSquareText, Lock, Download, Users, LogOut, XCircle } from 'lucide-react';
+import { Camera, CheckCircle, MapPin, Calendar, Clock, Upload, Heart, HeartCrack, Wine, MessageSquareText, Lock, Download, Users, LogOut, XCircle, AlertCircle } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, onSnapshot } from "firebase/firestore";
 
@@ -28,8 +28,6 @@ export default function App() {
   const [rsvpForm, setRsvpForm] = useState({ 
     name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' 
   });
-  const [rsvpStatus, setRsvpStatus] = useState(null);
-  const [rsvpFeedbackMsg, setRsvpFeedbackMsg] = useState('');
   
   const fileInputRef = useRef(null);
   
@@ -40,6 +38,12 @@ export default function App() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [adminTab, setAdminTab] = useState('rsvps');
   const [isLoaded, setIsLoaded] = useState(false);
+
+  // --- ESTADO DO MODAL FLUTUANTE (SUCESSO, PENA OU ERRO) ---
+  const [modal, setModal] = useState({ isOpen: false, type: 'success', message: '' });
+
+  const showModal = (type, message) => setModal({ isOpen: true, type, message });
+  const closeModal = () => setModal({ isOpen: false, type: 'success', message: '' });
 
   // --- EFEITO 1: CARREGAMENTO VISUAL TEMA DO BAILE ---
   useEffect(() => {
@@ -116,82 +120,80 @@ export default function App() {
     window.open("https://maps.app.goo.gl/bdwsnZq7ipQEJhQL9", "_blank", "noopener,noreferrer");
   };
 
-  // --- AÇÕES DO FORMULÁRIO DE PRESENÇA ---
-  const handleRsvpSubmit = async (e) => {
+  // --- AÇÕES DO FORMULÁRIO DE PRESENÇA (AGORA INSTANTÂNEAS) ---
+  const handleRsvpSubmit = (e) => {
     e.preventDefault();
 
     const nomeDigitado = rsvpForm.name.trim();
     if (!nomeDigitado) {
-        alert("O Nome Completo é obrigatório.");
-        return;
+        return showModal('error', "O Nome Completo é obrigatório.");
     }
 
     if (rsvpForm.child1Name.trim() && !rsvpForm.child1Age.trim()) {
-        alert("Por favor, preencha a idade do Filho 1.");
-        return;
+        return showModal('error', "Por favor, preencha a idade do Filho 1.");
     }
     if (rsvpForm.child2Name.trim() && !rsvpForm.child2Age.trim()) {
-        alert("Por favor, preencha a idade do Filho 2.");
-        return;
+        return showModal('error', "Por favor, preencha a idade do Filho 2.");
     }
     if (rsvpForm.child3Name.trim() && !rsvpForm.child3Age.trim()) {
-        alert("Por favor, preencha a idade do Filho 3.");
-        return;
+        return showModal('error', "Por favor, preencha a idade do Filho 3.");
     }
     
     const isDuplicate = rsvps.some(r => r.name.toLowerCase().trim() === nomeDigitado.toLowerCase());
     if (isDuplicate) {
-      alert("Este nome já consta na nossa lista de presenças! Se precisar de alterar algo, entre em contacto.");
-      return;
+      return showModal('error', "Este nome já consta na nossa lista de presenças! Se precisar de alterar algo, entre em contacto com a família.");
     }
     
-    try {
-      let totalGuests = 1; 
-      if (rsvpForm.companion.trim()) totalGuests++;
-      if (rsvpForm.child1Name.trim()) totalGuests++;
-      if (rsvpForm.child2Name.trim()) totalGuests++;
-      if (rsvpForm.child3Name.trim()) totalGuests++;
-      
-      // Salvar diretamente na coleção "presencas" do seu Firebase
-      await addDoc(collection(db, "presencas"), {
-        ...rsvpForm,
-        guests: totalGuests,
-        data: new Date().toISOString()
-      });
-      
-      // Feedback Visual de Sucesso
-      setRsvpStatus(rsvpForm.attending); 
-      if (rsvpForm.attending === 'yes') {
-        setRsvpFeedbackMsg("A sua presença foi confirmada com sucesso, vemo-nos no baile!");
-      } else {
-        setRsvpFeedbackMsg("Que pena que não poderá comparecer, a sua presença fará muita falta!");
-      }
-      
-      // Limpar formulário
-      setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
-    } catch (error) {
-      console.error("Erro ao salvar RSVP:", error);
-      alert("Houve um erro ao enviar a sua confirmação. Tente novamente mais tarde.");
+    let totalGuests = 1; 
+    if (rsvpForm.companion.trim()) totalGuests++;
+    if (rsvpForm.child1Name.trim()) totalGuests++;
+    if (rsvpForm.child2Name.trim()) totalGuests++;
+    if (rsvpForm.child3Name.trim()) totalGuests++;
+    
+    const dataToSave = {
+      ...rsvpForm,
+      guests: totalGuests,
+      data: new Date().toISOString()
+    };
+    
+    // 1. ABRIR A CAIXA FLUTUANTE IMEDIATAMENTE
+    if (rsvpForm.attending === 'yes') {
+      showModal('success', "A sua presença foi confirmada com sucesso, vemo-nos no baile!");
+    } else {
+      showModal('pity', "Que pena que não poderá comparecer, a sua presença fará muita falta!");
     }
+    
+    // 2. LIMPAR O FORMULÁRIO
+    setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
+
+    // 3. SALVAR NO FIREBASE EM SEGUNDO PLANO
+    addDoc(collection(db, "presencas"), dataToSave).catch((error) => {
+      console.error("Erro no envio em segundo plano:", error);
+    });
   };
 
-  const handleMessageSubmit = async () => {
+  const handleMessageSubmit = (e) => {
+    e.preventDefault();
     if (!currentMessage.author || !currentMessage.text) {
-        alert("Por favor, preencha o seu nome e a mensagem.");
-        return;
+        return showModal('error', "Por favor, preencha o seu nome e a mensagem.");
     }
-    try {
-      await addDoc(collection(db, "mensagens"), {
-        author: currentMessage.author,
-        text: currentMessage.text,
-        data: new Date().toISOString()
-      });
-      setCurrentMessage({ author: '', text: '' });
-      alert("A sua mensagem foi deixada no Livro de Ouro!");
-    } catch (error) {
-      console.error("Erro ao salvar mensagem:", error);
-      alert("Erro ao assinar o livro. Tente novamente.");
-    }
+    
+    const dataToSave = {
+      author: currentMessage.author,
+      text: currentMessage.text,
+      data: new Date().toISOString()
+    };
+
+    // 1. ABRIR A CAIXA FLUTUANTE IMEDIATAMENTE
+    showModal('success', "A sua mensagem foi deixada com carinho no Livro de Ouro!");
+    
+    // 2. LIMPAR O FORMULÁRIO
+    setCurrentMessage({ author: '', text: '' });
+
+    // 3. SALVAR EM SEGUNDO PLANO
+    addDoc(collection(db, "mensagens"), dataToSave).catch((error) => {
+      console.error("Erro ao salvar mensagem em segundo plano:", error);
+    });
   };
 
   const handleMediaUpload = (e) => {
@@ -211,7 +213,7 @@ export default function App() {
     if (loginForm.username === 'Maria_Eduarda' && loginForm.password === 'Duda114516!') {
       setIsAdmin(true);
     } else {
-      alert('Credenciais incorretas. Acesso negado.');
+      showModal('error', 'Credenciais incorretas. Acesso negado.');
     }
   };
 
@@ -251,6 +253,10 @@ export default function App() {
           .input-elegant::placeholder { color: rgba(199, 161, 83, 0.7); font-weight: 300; }
           .custom-scrollbar::-webkit-scrollbar { width: 6px; }
           .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(199, 161, 83, 0.5); border-radius: 10px; }
+          
+          /* Animações nativas para a Caixa Flutuante e Abas */
+          @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+          @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
         `}
       </style>
 
@@ -260,7 +266,7 @@ export default function App() {
 
         <div className="relative z-10 container mx-auto px-4 py-12 md:py-20 min-h-screen flex flex-col items-center">
           
-          <header className="text-center mb-12 w-full animate-fade-in-down flex flex-col items-center">
+          <header className="text-center mb-12 w-full flex flex-col items-center" style={{ animation: 'fadeInDown 0.8s ease-out forwards' }}>
             <h2 className="text-xs md:text-sm tracking-[0.4em] uppercase mb-6 text-[#C7A153] font-light">Os Meus 15 Anos</h2>
             <h1 className="text-7xl md:text-8xl lg:text-9xl mb-6 font-script gold-gradient-text drop-shadow-2xl font-normal tracking-wide" style={{ lineHeight: '1.2' }}>
               Maria Eduarda
@@ -295,7 +301,7 @@ export default function App() {
             
             {/* TAB: ADMIN */}
             {activeTab === 'admin' && (
-              <div className="animate-fade-in space-y-10">
+              <div className="space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 {!isAdmin ? (
                   <div className="max-w-sm mx-auto text-center space-y-8">
                     <Lock className="mx-auto text-[#C7A153]" size={48} strokeWidth={1} />
@@ -403,7 +409,7 @@ export default function App() {
 
             {/* TAB: CONVITE */}
             {activeTab === 'convite' && (
-              <div className="text-center space-y-12 animate-fade-in">
+              <div className="text-center space-y-12" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="space-y-6">
                   <h3 className="text-3xl md:text-4xl font-serif italic gold-gradient-text font-semibold">Venham comemorar este dia especial comigo.</h3>
                   <p className="text-[#FFF0B3] font-sans font-medium text-sm md:text-base max-w-xl mx-auto leading-loose opacity-95">
@@ -432,7 +438,7 @@ export default function App() {
                     </div>
                   </div>
                   
-                  {/* ENDEREÇO CLICÁVEL (GOOGLE MAPS) COM ROTA DIRETA E SEGURA */}
+                  {/* ENDEREÇO CLICÁVEL (GOOGLE MAPS) */}
                   <button 
                     onClick={handleMapOpen}
                     type="button"
@@ -453,7 +459,7 @@ export default function App() {
                 <div className="flex flex-col items-center gap-4 pt-4">
                   <Wine className="text-[#C7A153]" strokeWidth={1.5} size={32} />
                   <p className="font-sans text-[#FFF0B3] font-medium text-sm leading-loose max-w-lg opacity-95">
-                    Na festa serão servidos sucos, refrigerantes e águas, mas sinta-se à vontade para levar a sua geleira com a sua bebida alcoólica preferida.
+                    Na festa serão servidos sucos, refrigerantes e águas, mas sinta-se à vontade para levar o seu cooler com a sua bebida alcoólica preferida.
                   </p>
                 </div>
               </div>
@@ -461,7 +467,7 @@ export default function App() {
 
             {/* TAB: SUGESTÕES DE PRESENTE */}
             {activeTab === 'presentes' && (
-              <div className="animate-fade-in space-y-12">
+              <div className="space-y-12" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="text-center space-y-4">
                   <h3 className="text-3xl md:text-4xl font-serif italic gold-gradient-text font-semibold">Sugestões de Presente</h3>
                   <p className="font-sans text-[#FFF0B3] font-medium text-sm max-w-lg mx-auto opacity-95">Abaixo estão algumas sugestões com as minhas preferências. O que me der vou receber com muito amor!</p>
@@ -470,8 +476,8 @@ export default function App() {
                   <div className="relative">
                     <h4 className="text-sm font-bold uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center">Roupa & Sapatos</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-sm font-medium text-[#FFF0B3]">
-                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Camisola</span> <span>Tam M</span></div>
-                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Calções/Calças</span> <span>Tam M (Jeans 38)</span></div>
+                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Camiseta</span> <span>Tam M</span></div>
+                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Calça/Shorts</span> <span>Tam M (Jeans 38)</span></div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Vestido</span> <span>Tam M</span></div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Sapatos/Ténis</span> <span>Tam 37</span></div>
                     </div>
@@ -481,13 +487,13 @@ export default function App() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-sm font-medium text-[#FFF0B3]">
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Brincos / Corrente / Pulseira</span> <span>Prata ou Dourado</span></div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Anel</span> <span>Tam 16</span></div>
-                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Mala</span> <span>Pequena</span></div>
+                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Bolsa</span> <span>Pequena</span></div>
                     </div>
                   </div>
                   <div className="relative">
                     <h4 className="text-sm font-bold uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center">Cosméticos</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-sm font-medium text-[#FFF0B3]">
-                      <div className="flex flex-col border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold mb-1">Perfumes / Cremes Hidratantes</span> <span className="text-xs">Nada amadeirado ou demasiado doce.</span></div>
+                      <div className="flex flex-col border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold mb-1">Perfumes / Cremes Hidratantes</span> <span className="text-xs">Nada amadeirado ou MUITO doce.</span></div>
                       <div className="flex flex-col border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold mb-1">Cabelo</span> <span className="text-xs">Produtos em geral.</span></div>
                       <div className="flex flex-col md:col-span-2 border-b border-[#C7A153]/30 pb-2 text-center items-center"><span className="text-[#C7A153] font-bold mb-1">Maquilhagem</span> <span className="text-xs">Qualquer marca (exceto Max Love).</span></div>
                     </div>
@@ -501,67 +507,48 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB: PRESENÇA (MENSAGEM DE SUCESSO OU FORMULÁRIO) */}
+            {/* TAB: PRESENÇA */}
             {activeTab === 'rsvp' && (
-              <div className="max-w-md mx-auto animate-fade-in space-y-10">
-                {rsvpStatus ? (
-                  /* --- TELA DE SUCESSO PÓS-ENVIO --- */
-                  <div className="text-center p-10 border border-[#C7A153]/40 rounded-sm bg-[#110103]/80 shadow-[0_0_20px_rgba(199,161,83,0.15)] animate-fade-in">
-                    {rsvpStatus === 'yes' ? (
-                      <CheckCircle className="mx-auto text-[#C7A153] mb-4" size={56} strokeWidth={1.5} />
-                    ) : (
-                      <XCircle className="mx-auto text-[#C7A153] mb-4" size={56} strokeWidth={1.5} />
-                    )}
-                    <h4 className="text-2xl font-serif italic text-[#FFF0B3] mb-4">Obrigada!</h4>
-                    <p className="text-base font-sans text-[#FFF0B3] leading-relaxed">{rsvpFeedbackMsg}</p>
-                    <button onClick={() => setRsvpStatus(null)} className="mt-8 text-[10px] uppercase tracking-[0.2em] font-bold text-[#C7A153] hover:text-[#FFF0B3] border-b border-[#C7A153] pb-1 transition-all">
-                      Registar outra pessoa
-                    </button>
-                  </div>
-                ) : (
-                  /* --- FORMULÁRIO NORMAL --- */
-                  <>
-                    <div className="text-center space-y-4">
-                      <h3 className="text-3xl font-serif italic gold-gradient-text font-semibold">Confirme a sua Presença</h3>
-                      <p className="font-sans text-[#FFF0B3] font-medium text-sm opacity-95">A sua presença é fundamental. Por favor, confirme até ao dia 10 de Junho.</p>
-                    </div>
+              <div className="max-w-md mx-auto space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
+                <div className="text-center space-y-4">
+                  <h3 className="text-3xl font-serif italic gold-gradient-text font-semibold">Confirme a sua Presença</h3>
+                  <p className="font-sans text-[#FFF0B3] font-medium text-sm opacity-95">A sua presença é fundamental. Por favor, confirme até ao dia 10 de Junho.</p>
+                </div>
 
-                    <form onSubmit={handleRsvpSubmit} className="space-y-8 font-sans font-medium">
-                      <div className="relative"><input type="text" required placeholder="O seu Nome Completo *" value={rsvpForm.name} onChange={(e) => setRsvpForm({...rsvpForm, name: e.target.value})} className="w-full input-elegant text-sm font-medium" /></div>
-                      <div className="relative"><input type="text" placeholder="Nome do Acompanhante (Opcional)" value={rsvpForm.companion} onChange={(e) => setRsvpForm({...rsvpForm, companion: e.target.value})} className="w-full input-elegant text-sm font-medium" /></div>
-                      <div className="pt-4 border-t border-[#C7A153]/40">
-                        <h4 className="text-sm font-bold uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center drop-shadow-md">Filhos</h4>
-                        <div className="space-y-4">
-                          <div className="flex gap-4"><input type="text" placeholder="Nome do Filho 1" value={rsvpForm.child1Name} onChange={(e) => setRsvpForm({...rsvpForm, child1Name: e.target.value})} className="flex-1 input-elegant text-sm font-medium" /><input type="text" placeholder="Idade" value={rsvpForm.child1Age} onChange={(e) => setRsvpForm({...rsvpForm, child1Age: e.target.value})} className="w-16 input-elegant text-sm text-center font-medium" /></div>
-                          <div className="flex gap-4"><input type="text" placeholder="Nome do Filho 2" value={rsvpForm.child2Name} onChange={(e) => setRsvpForm({...rsvpForm, child2Name: e.target.value})} className="flex-1 input-elegant text-sm font-medium" /><input type="text" placeholder="Idade" value={rsvpForm.child2Age} onChange={(e) => setRsvpForm({...rsvpForm, child2Age: e.target.value})} className="w-16 input-elegant text-sm text-center font-medium" /></div>
-                          <div className="flex gap-4"><input type="text" placeholder="Nome do Filho 3" value={rsvpForm.child3Name} onChange={(e) => setRsvpForm({...rsvpForm, child3Name: e.target.value})} className="flex-1 input-elegant text-sm font-medium" /><input type="text" placeholder="Idade" value={rsvpForm.child3Age} onChange={(e) => setRsvpForm({...rsvpForm, child3Age: e.target.value})} className="w-16 input-elegant text-sm text-center font-medium" /></div>
-                        </div>
-                      </div>
-                      <div className="pt-6 border-t border-[#C7A153]/40">
-                        <label className="block text-center text-[#FFF0B3] font-bold mb-6 text-sm uppercase tracking-[0.3em] drop-shadow-md">Estará presente?</label>
-                        <div className="flex gap-6 justify-center">
-                          <label className="cursor-pointer group flex flex-col items-center gap-2">
-                            <input type="radio" name="attending" value="yes" className="hidden" checked={rsvpForm.attending === 'yes'} onChange={() => setRsvpForm({...rsvpForm, attending: 'yes'})} />
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${rsvpForm.attending === 'yes' ? 'border-[#C7A153] bg-[#C7A153] shadow-[0_0_12px_#C7A153]' : 'border-[#C7A153] bg-transparent'}`}>{rsvpForm.attending === 'yes' && <div className="w-2 h-2 bg-[#110103] rounded-full"></div>}</div>
-                            <span className={`text-xs uppercase tracking-wider transition-all ${rsvpForm.attending === 'yes' ? 'text-[#FFF0B3] font-bold' : 'text-[#C7A153] font-medium'}`}>Com certeza</span>
-                          </label>
-                          <label className="cursor-pointer group flex flex-col items-center gap-2">
-                            <input type="radio" name="attending" value="no" className="hidden" checked={rsvpForm.attending === 'no'} onChange={() => setRsvpForm({...rsvpForm, attending: 'no'})} />
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${rsvpForm.attending === 'no' ? 'border-[#C7A153]' : 'border-[#C7A153] bg-transparent'}`}>{rsvpForm.attending === 'no' && <div className="w-2.5 h-2.5 bg-[#C7A153] rounded-full"></div>}</div>
-                            <span className={`text-xs uppercase tracking-wider transition-all ${rsvpForm.attending === 'no' ? 'text-[#FFF0B3] font-bold' : 'text-[#C7A153] font-medium'}`}>Não poderei</span>
-                          </label>
-                        </div>
-                      </div>
-                      <button type="submit" className="w-full mt-8 border border-[#C7A153] hover:bg-[#C7A153]/20 text-[#FFF0B3] font-bold py-4 rounded-sm transition-all duration-500 text-xs uppercase tracking-[0.3em] shadow-[0_0_15px_rgba(199,161,83,0.2)]">Enviar Resposta</button>
-                    </form>
-                  </>
-                )}
+                <form onSubmit={handleRsvpSubmit} className="space-y-8 font-sans font-medium relative">
+                  <div className="relative"><input type="text" required placeholder="O seu Nome Completo *" value={rsvpForm.name} onChange={(e) => setRsvpForm({...rsvpForm, name: e.target.value})} className="w-full input-elegant text-sm font-medium" /></div>
+                  <div className="relative"><input type="text" placeholder="Nome do Acompanhante (Opcional)" value={rsvpForm.companion} onChange={(e) => setRsvpForm({...rsvpForm, companion: e.target.value})} className="w-full input-elegant text-sm font-medium" /></div>
+                  <div className="pt-4 border-t border-[#C7A153]/40">
+                    <h4 className="text-sm font-bold uppercase tracking-[0.3em] text-[#FFF0B3] mb-6 text-center drop-shadow-md">Filhos</h4>
+                    <div className="space-y-4">
+                      <div className="flex gap-4"><input type="text" placeholder="Nome do Filho 1" value={rsvpForm.child1Name} onChange={(e) => setRsvpForm({...rsvpForm, child1Name: e.target.value})} className="flex-1 input-elegant text-sm font-medium" /><input type="text" placeholder="Idade" value={rsvpForm.child1Age} onChange={(e) => setRsvpForm({...rsvpForm, child1Age: e.target.value})} className="w-16 input-elegant text-sm text-center font-medium" /></div>
+                      <div className="flex gap-4"><input type="text" placeholder="Nome do Filho 2" value={rsvpForm.child2Name} onChange={(e) => setRsvpForm({...rsvpForm, child2Name: e.target.value})} className="flex-1 input-elegant text-sm font-medium" /><input type="text" placeholder="Idade" value={rsvpForm.child2Age} onChange={(e) => setRsvpForm({...rsvpForm, child2Age: e.target.value})} className="w-16 input-elegant text-sm text-center font-medium" /></div>
+                      <div className="flex gap-4"><input type="text" placeholder="Nome do Filho 3" value={rsvpForm.child3Name} onChange={(e) => setRsvpForm({...rsvpForm, child3Name: e.target.value})} className="flex-1 input-elegant text-sm font-medium" /><input type="text" placeholder="Idade" value={rsvpForm.child3Age} onChange={(e) => setRsvpForm({...rsvpForm, child3Age: e.target.value})} className="w-16 input-elegant text-sm text-center font-medium" /></div>
+                    </div>
+                  </div>
+                  <div className="pt-6 border-t border-[#C7A153]/40">
+                    <label className="block text-center text-[#FFF0B3] font-bold mb-6 text-sm uppercase tracking-[0.3em] drop-shadow-md">Estará presente?</label>
+                    <div className="flex gap-6 justify-center">
+                      <label className="cursor-pointer group flex flex-col items-center gap-2">
+                        <input type="radio" name="attending" value="yes" className="hidden" checked={rsvpForm.attending === 'yes'} onChange={() => setRsvpForm({...rsvpForm, attending: 'yes'})} />
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${rsvpForm.attending === 'yes' ? 'border-[#C7A153] bg-[#C7A153] shadow-[0_0_12px_#C7A153]' : 'border-[#C7A153] bg-transparent'}`}>{rsvpForm.attending === 'yes' && <div className="w-2 h-2 bg-[#110103] rounded-full"></div>}</div>
+                        <span className={`text-xs uppercase tracking-wider transition-all ${rsvpForm.attending === 'yes' ? 'text-[#FFF0B3] font-bold' : 'text-[#C7A153] font-medium'}`}>Com certeza</span>
+                      </label>
+                      <label className="cursor-pointer group flex flex-col items-center gap-2">
+                        <input type="radio" name="attending" value="no" className="hidden" checked={rsvpForm.attending === 'no'} onChange={() => setRsvpForm({...rsvpForm, attending: 'no'})} />
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${rsvpForm.attending === 'no' ? 'border-[#C7A153]' : 'border-[#C7A153] bg-transparent'}`}>{rsvpForm.attending === 'no' && <div className="w-2.5 h-2.5 bg-[#C7A153] rounded-full"></div>}</div>
+                        <span className={`text-xs uppercase tracking-wider transition-all ${rsvpForm.attending === 'no' ? 'text-[#FFF0B3] font-bold' : 'text-[#C7A153] font-medium'}`}>Não poderei</span>
+                      </label>
+                    </div>
+                  </div>
+                  <button type="submit" className="w-full mt-8 bg-gradient-to-r from-[#C7A153]/90 to-[#C7A153]/60 hover:from-[#C7A153] hover:to-[#C7A153]/80 text-[#110103] font-bold py-4 rounded-sm transition-all duration-500 text-xs uppercase tracking-[0.3em] shadow-[0_0_15px_rgba(199,161,83,0.2)]">Enviar Resposta</button>
+                </form>
               </div>
             )}
 
             {/* TAB: GALERIA */}
             {activeTab === 'galeria' && (
-              <div className="animate-fade-in space-y-10">
+              <div className="space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="text-center space-y-4">
                   <h3 className="text-3xl font-serif italic gold-gradient-text font-semibold">Memórias Inesquecíveis</h3>
                   <p className="font-sans text-[#FFF0B3] font-medium text-sm max-w-lg mx-auto opacity-95">Tirou uma foto ou gravou um vídeo lindo na festa? Envie aqui.</p>
@@ -589,7 +576,7 @@ export default function App() {
 
             {/* TAB: LIVRO DE OURO SEM IA */}
             {activeTab === 'recados' && (
-              <div className="animate-fade-in space-y-10">
+              <div className="space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="text-center space-y-4">
                   <h3 className="text-3xl md:text-4xl font-serif italic gold-gradient-text font-semibold">Livro de Ouro</h3>
                   <p className="font-sans text-[#FFF0B3] font-medium text-sm max-w-lg mx-auto opacity-95">Deixe uma mensagem especial para a Maria Eduarda.</p>
@@ -598,7 +585,7 @@ export default function App() {
                   <div className="absolute top-0 right-0 w-32 h-32 bg-[#C7A153]/10 rounded-full blur-3xl"></div>
                   <div className="space-y-6 relative z-10">
                     <input type="text" placeholder="O seu Nome" value={currentMessage.author} onChange={(e) => setCurrentMessage({...currentMessage, author: e.target.value})} className="w-full input-elegant text-sm font-medium px-2" />
-                    <textarea placeholder="Escreva a sua mensagem simples aqui..." value={currentMessage.text} onChange={(e) => setCurrentMessage({...currentMessage, text: e.target.value})} className="w-full input-elegant text-sm font-medium h-24 resize-none px-2 custom-scrollbar" />
+                    <textarea placeholder="Escreva a sua mensagem aqui..." value={currentMessage.text} onChange={(e) => setCurrentMessage({...currentMessage, text: e.target.value})} className="w-full input-elegant text-sm font-medium h-24 resize-none px-2 custom-scrollbar" />
                   </div>
                   <div className="pt-2 relative z-10 flex justify-center">
                     <button onClick={handleMessageSubmit} disabled={!currentMessage.author || !currentMessage.text} className="w-full bg-gradient-to-r from-[#C7A153]/90 to-[#C7A153]/60 hover:from-[#C7A153] hover:to-[#C7A153]/80 text-[#110103] font-bold py-4 rounded-sm transition-all text-xs uppercase tracking-widest disabled:opacity-50 shadow-[0_0_15px_rgba(199,161,83,0.2)]">
@@ -629,6 +616,44 @@ export default function App() {
             <button onClick={() => setActiveTab('admin')} className="text-[#C7A153] hover:text-[#FFF0B3] transition-colors mt-2 p-2 flex items-center justify-center rounded-full hover:bg-[#C7A153]/20" title="Acesso da Administração"><Lock size={16} /></button>
           </footer>
         </div>
+
+        {/* MODAL FLUTUANTE UNIFICADO COM AS VARIAÇÕES DE DESIGN (SUCESSO, PENA E ERRO) */}
+        {modal.isOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0a0002]/90 backdrop-blur-sm p-4" style={{ animation: 'fadeIn 0.3s ease-out' }}>
+            <div className="bg-[#110103] border border-[#C7A153] shadow-[0_0_50px_rgba(199,161,83,0.3)] rounded-lg p-8 max-w-sm w-full text-center relative" style={{ animation: 'fadeInDown 0.4s ease-out' }}>
+              <button 
+                onClick={closeModal} 
+                className="absolute top-4 right-4 text-[#C7A153] hover:text-[#FFF0B3] transition-colors"
+                title="Fechar"
+              >
+                <XCircle size={24} strokeWidth={1.5} />
+              </button>
+              
+              {/* ÍCONES: MUDA DE ACORDO COM O TIPO DE MENSAGEM */}
+              {modal.type === 'success' && <CheckCircle className="mx-auto text-[#C7A153] mb-6 drop-shadow-[0_0_15px_rgba(199,161,83,0.5)]" size={64} strokeWidth={1.5} />}
+              {modal.type === 'pity' && <HeartCrack className="mx-auto text-[#C7A153] mb-6 drop-shadow-[0_0_15px_rgba(199,161,83,0.5)]" size={64} strokeWidth={1.5} />}
+              {modal.type === 'error' && <AlertCircle className="mx-auto text-red-500 mb-6 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]" size={64} strokeWidth={1.5} />}
+              
+              <h4 className="text-3xl font-serif italic gold-gradient-text mb-4">
+                {modal.type === 'success' && 'Obrigada!'}
+                {modal.type === 'pity' && 'Ah, que pena...'}
+                {modal.type === 'error' && 'Aviso'}
+              </h4>
+              
+              <p className="text-sm font-sans text-[#FFF0B3] leading-relaxed mb-8 opacity-95">
+                {modal.message}
+              </p>
+              
+              <button 
+                onClick={closeModal} 
+                className={`w-full font-bold py-3 rounded-sm transition-all text-xs uppercase tracking-widest shadow-lg ${(modal.type === 'success' || modal.type === 'pity') ? 'bg-gradient-to-r from-[#C7A153]/90 to-[#C7A153]/60 hover:from-[#C7A153] hover:to-[#C7A153]/80 text-[#110103]' : 'border border-red-500 text-red-500 hover:bg-red-500/10'}`}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>
     </>
   );
