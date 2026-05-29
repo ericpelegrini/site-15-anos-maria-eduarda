@@ -113,14 +113,13 @@ export default function App() {
     };
   }, []);
 
-  // --- ABERTURA FORÇADA E SEGURA DO MAPA ---
   const handleMapOpen = (e) => {
     e.preventDefault();
     e.stopPropagation();
     window.open("https://maps.app.goo.gl/bdwsnZq7ipQEJhQL9", "_blank", "noopener,noreferrer");
   };
 
-  // --- AÇÕES DO FORMULÁRIO DE PRESENÇA (AGORA INSTANTÂNEAS) ---
+  // --- AÇÕES DO FORMULÁRIO DE PRESENÇA COM INTEGRAÇÃO WHATSAPP ---
   const handleRsvpSubmit = (e) => {
     e.preventDefault();
 
@@ -141,7 +140,7 @@ export default function App() {
     
     const isDuplicate = rsvps.some(r => r.name.toLowerCase().trim() === nomeDigitado.toLowerCase());
     if (isDuplicate) {
-      return showModal('error', "Este nome já consta na nossa lista de presenças! Se precisar de alterar algo, entre em contacto com a família.");
+      return showModal('error', "Este nome já consta na nossa lista de presenças! Se precisar de alterar algo, entre em contato com a família.");
     }
     
     let totalGuests = 1; 
@@ -150,26 +149,44 @@ export default function App() {
     if (rsvpForm.child2Name.trim()) totalGuests++;
     if (rsvpForm.child3Name.trim()) totalGuests++;
     
+    // --- GERAÇÃO DA MENSAGEM AUTOMÁTICA PARA O WHATSAPP ---
+    let wpText = `*NOVA RESPOSTA DE PRESENÇA - 15 ANOS DUDA* 🎭\n\n`;
+    wpText += `*Convidado Principal:* ${rsvpForm.name}\n`;
+    wpText += `*Status:* ${rsvpForm.attending === 'yes' ? '✅ CONFIRMADO' : '❌ NÃO PODERÁ IR'}\n`;
+    
+    if (rsvpForm.attending === 'yes') {
+        if (rsvpForm.companion.trim()) wpText += `*Acompanhante:* ${rsvpForm.companion}\n`;
+        if (rsvpForm.child1Name.trim()) wpText += `*Filho(a) 1:* ${rsvpForm.child1Name} (${rsvpForm.child1Age} anos)\n`;
+        if (rsvpForm.child2Name.trim()) wpText += `*Filho(a) 2:* ${rsvpForm.child2Name} (${rsvpForm.child2Age} anos)\n`;
+        if (rsvpForm.child3Name.trim()) wpText += `*Filho(a) 3:* ${rsvpForm.child3Name} (${rsvpForm.child3Age} anos)\n`;
+        wpText += `\n*Total de pessoas:* ${totalGuests}`;
+    }
+    
+    // Abrir o WhatsApp em uma nova aba antes do banco de dados (para evitar bloqueadores de pop-up)
+    const numeroEsposa = "5511971030971";
+    const wpUrl = `https://wa.me/${numeroEsposa}?text=${encodeURIComponent(wpText)}`;
+    window.open(wpUrl, '_blank');
+
+    // --- SALVAR NO BANCO DE DADOS FIREBASE ---
     const dataToSave = {
       ...rsvpForm,
       guests: totalGuests,
       data: new Date().toISOString()
     };
     
-    // 1. ABRIR A CAIXA FLUTUANTE IMEDIATAMENTE
+    addDoc(collection(db, "presencas"), dataToSave).catch((error) => {
+      console.error("Erro no envio em segundo plano:", error);
+    });
+
+    // 1. ABRIR A CAIXA FLUTUANTE NO SITE
     if (rsvpForm.attending === 'yes') {
-      showModal('success', "A sua presença foi confirmada com sucesso, vemo-nos no baile!");
+      showModal('success', "A sua presença foi confirmada com sucesso, vemo-nos no baile! (Enviamos também para o nosso WhatsApp para controle).");
     } else {
       showModal('pity', "Que pena que não poderá comparecer, a sua presença fará muita falta!");
     }
     
     // 2. LIMPAR O FORMULÁRIO
     setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
-
-    // 3. SALVAR NO FIREBASE EM SEGUNDO PLANO
-    addDoc(collection(db, "presencas"), dataToSave).catch((error) => {
-      console.error("Erro no envio em segundo plano:", error);
-    });
   };
 
   const handleMessageSubmit = (e) => {
@@ -184,13 +201,9 @@ export default function App() {
       data: new Date().toISOString()
     };
 
-    // 1. ABRIR A CAIXA FLUTUANTE IMEDIATAMENTE
     showModal('success', "A sua mensagem foi deixada com carinho no Livro de Ouro!");
-    
-    // 2. LIMPAR O FORMULÁRIO
     setCurrentMessage({ author: '', text: '' });
 
-    // 3. SALVAR EM SEGUNDO PLANO
     addDoc(collection(db, "mensagens"), dataToSave).catch((error) => {
       console.error("Erro ao salvar mensagem em segundo plano:", error);
     });
@@ -254,7 +267,6 @@ export default function App() {
           .custom-scrollbar::-webkit-scrollbar { width: 6px; }
           .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(199, 161, 83, 0.5); border-radius: 10px; }
           
-          /* Animações nativas para a Caixa Flutuante e Abas */
           @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
           @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
         `}
@@ -299,7 +311,7 @@ export default function App() {
 
           <main className="w-full max-w-3xl glass-panel rounded-lg p-8 md:p-16 transition-all duration-700">
             
-            {/* TAB: ADMIN */}
+            {/* TAB: ADMIN (ÁREA DE CONTROLE REORGANIZADA) */}
             {activeTab === 'admin' && (
               <div className="space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 {!isAdmin ? (
@@ -310,15 +322,15 @@ export default function App() {
                       <p className="font-sans text-[#FFF0B3] font-light text-xs">Acesso exclusivo para a administração do evento.</p>
                     </div>
                     <form onSubmit={handleAdminLogin} className="space-y-6">
-                      <input type="text" placeholder="Utilizador" value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="w-full input-elegant text-sm text-center" />
-                      <input type="password" placeholder="Palavra-passe" value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} className="w-full input-elegant text-sm text-center" />
+                      <input type="text" placeholder="Usuário" value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="w-full input-elegant text-sm text-center" />
+                      <input type="password" placeholder="Senha" value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} className="w-full input-elegant text-sm text-center" />
                       <button type="submit" className="w-full border border-[#C7A153] text-[#FFF0B3] hover:bg-[#C7A153]/10 py-3 rounded-sm transition-all text-xs uppercase tracking-[0.2em]">Entrar</button>
                     </form>
                   </div>
                 ) : (
                   <div className="space-y-8">
                     <div className="flex justify-between items-center border-b border-[#C7A153]/20 pb-6">
-                      <h3 className="text-2xl font-serif italic gold-gradient-text">Painel de Controlo</h3>
+                      <h3 className="text-2xl font-serif italic gold-gradient-text">Painel de Controle</h3>
                       <button onClick={() => setIsAdmin(false)} className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[#C7A153] hover:text-[#FFF0B3]"><LogOut size={14} /> Sair</button>
                     </div>
 
@@ -332,40 +344,76 @@ export default function App() {
                       <div className="space-y-6">
                         <div className="bg-[#110103]/60 p-4 rounded-sm border border-[#C7A153]/20 flex justify-around text-center mb-4">
                           <div><span className="block text-2xl font-serif text-[#FFF0B3]">{rsvps.filter(r => r.attending === 'yes').length}</span><span className="text-[10px] text-[#C7A153] uppercase">Convites</span></div>
-                          <div><span className="block text-2xl font-serif text-[#FFF0B3]">{rsvps.filter(r => r.attending === 'yes').reduce((acc, curr) => acc + (curr.guests || 1), 0)}</span><span className="text-[10px] text-[#C7A153] uppercase">Total de Pessoas</span></div>
+                          <div><span className="block text-2xl font-serif text-[#FFF0B3]">{rsvps.filter(r => r.attending === 'yes').reduce((acc, curr) => acc + (curr.guests || 1), 0)}</span><span className="text-[10px] text-[#C7A153] uppercase">Total Pessoas</span></div>
                           <div><span className="block text-2xl font-serif text-[#FFF0B3]">{rsvps.filter(r => r.attending === 'no').length}</span><span className="text-[10px] text-[#C7A153] uppercase">Ausentes</span></div>
                         </div>
                         
-                        {rsvps.length === 0 ? <p className="text-center text-sm text-[#C7A153] italic">Nenhuma confirmação ainda.</p> : (
-                          <div className="space-y-6">
+                        {rsvps.length === 0 ? <p className="text-center text-sm text-[#C7A153] italic">Nenhuma confirmação carregada.</p> : (
+                          <div className="space-y-8">
+                            
+                            {/* LISTA DE CONFIRMADOS (ORGANIZADA) */}
                             <div>
-                              <h4 className="text-[#FFF0B3] border-b border-[#C7A153]/30 pb-2 mb-3 text-sm uppercase tracking-widest flex items-center justify-between font-medium">Lista de Convidados (Confirmados) <CheckCircle size={14} className="text-[#C7A153]" /></h4>
-                              <div className="space-y-3">
+                              <h4 className="text-[#FFF0B3] border-b border-[#C7A153]/30 pb-2 mb-4 text-sm uppercase tracking-widest flex items-center justify-between font-medium">
+                                Lista de Convidados (Confirmados) <CheckCircle size={14} className="text-[#C7A153]" />
+                              </h4>
+                              
+                              <div className="space-y-4">
                                 {rsvps.filter(r => r.attending === 'yes').map((rsvp, idx) => (
-                                  <div key={idx} className="flex flex-col bg-[#110103]/40 p-4 rounded-sm border border-[#C7A153]/10 text-sm">
-                                    <div className="flex justify-between items-center mb-2">
-                                      <span className="text-[#FFF0B3] font-medium">{rsvp.name}</span>
-                                      <span className="text-[10px] text-[#C7A153] uppercase font-bold bg-[#C7A153]/10 px-2 py-1 rounded-sm">{rsvp.guests || 1} pessoa(s)</span>
-                                    </div>
-                                    {(rsvp.companion || rsvp.child1Name || rsvp.child2Name || rsvp.child3Name) && (
-                                      <div className="pl-3 border-l-2 border-[#C7A153]/20 space-y-1 mt-1">
-                                        {rsvp.companion && <span className="block text-xs text-[#FFF0B3]"><span className="text-[#C7A153]">Companheiro(a):</span> {rsvp.companion}</span>}
-                                        {rsvp.child1Name && <span className="block text-xs text-[#FFF0B3]"><span className="text-[#C7A153]">Filho(a) 1:</span> {rsvp.child1Name} <span className="text-[10px] text-[#C7A153]">({rsvp.child1Age} anos)</span></span>}
-                                        {rsvp.child2Name && <span className="block text-xs text-[#FFF0B3]"><span className="text-[#C7A153]">Filho(a) 2:</span> {rsvp.child2Name} <span className="text-[10px] text-[#C7A153]">({rsvp.child2Age} anos)</span></span>}
-                                        {rsvp.child3Name && <span className="block text-xs text-[#FFF0B3]"><span className="text-[#C7A153]">Filho(a) 3:</span> {rsvp.child3Name} <span className="text-[10px] text-[#C7A153]">({rsvp.child3Age} anos)</span></span>}
+                                  <div key={idx} className="bg-[#110103]/60 p-5 rounded-md border border-[#C7A153]/30 text-sm shadow-md transition-hover hover:border-[#C7A153]/70">
+                                    
+                                    {/* Cabeçalho do Card */}
+                                    <div className="flex justify-between items-center mb-3 border-b border-[#C7A153]/20 pb-3">
+                                      <div>
+                                        <span className="text-[#FFF0B3] font-bold text-base md:text-lg block">{rsvp.name}</span>
+                                        <span className="text-[10px] text-[#C7A153] uppercase tracking-wider">Convidado Principal</span>
                                       </div>
+                                      <span className="text-[10px] text-[#110103] uppercase font-bold bg-[#C7A153] px-3 py-1 rounded-full">{rsvp.guests || 1} pessoa(s)</span>
+                                    </div>
+                                    
+                                    {/* Detalhes de Acompanhantes e Filhos */}
+                                    {(rsvp.companion || rsvp.child1Name || rsvp.child2Name || rsvp.child3Name) ? (
+                                      <div className="space-y-2 mt-3 bg-black/30 p-3 rounded border border-[#C7A153]/10">
+                                        {rsvp.companion && (
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-[#C7A153] font-semibold text-xs uppercase tracking-wider w-28">Acompanhante:</span> 
+                                            <span className="text-[#FFF0B3] font-medium">{rsvp.companion}</span>
+                                          </div>
+                                        )}
+                                        {rsvp.child1Name && (
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[#C7A153] font-semibold text-xs uppercase tracking-wider w-28">Filho(a) 1:</span> 
+                                            <span className="text-[#FFF0B3] font-medium">{rsvp.child1Name} <span className="text-xs text-[#C7A153] ml-1">({rsvp.child1Age} anos)</span></span>
+                                          </div>
+                                        )}
+                                        {rsvp.child2Name && (
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[#C7A153] font-semibold text-xs uppercase tracking-wider w-28">Filho(a) 2:</span> 
+                                            <span className="text-[#FFF0B3] font-medium">{rsvp.child2Name} <span className="text-xs text-[#C7A153] ml-1">({rsvp.child2Age} anos)</span></span>
+                                          </div>
+                                        )}
+                                        {rsvp.child3Name && (
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[#C7A153] font-semibold text-xs uppercase tracking-wider w-28">Filho(a) 3:</span> 
+                                            <span className="text-[#FFF0B3] font-medium">{rsvp.child3Name} <span className="text-xs text-[#C7A153] ml-1">({rsvp.child3Age} anos)</span></span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="text-[11px] text-[#C7A153]/60 italic mt-3 bg-black/20 p-2 rounded">Irá sozinho(a). Sem acompanhantes ou filhos registrados.</div>
                                     )}
                                   </div>
                                 ))}
                               </div>
                             </div>
+
+                            {/* LISTA DE AUSENTES */}
                             <div>
                               <h4 className="text-[#FFF0B3] border-b border-[#C7A153]/30 pb-2 mb-3 text-sm uppercase tracking-widest flex items-center justify-between font-medium">Não irão (Ausentes) <Users size={14} className="text-[#C7A153]" /></h4>
                               <div className="space-y-2">
                                 {rsvps.filter(r => r.attending === 'no').map((rsvp, idx) => (
-                                  <div key={idx} className="flex justify-between items-center bg-[#110103]/20 p-3 rounded-sm border border-[#C7A153]/5 text-sm opacity-60">
+                                  <div key={idx} className="flex justify-between items-center bg-[#110103]/20 p-3 rounded-sm border border-[#C7A153]/10 text-sm opacity-70">
                                     <span className="text-[#FFF0B3] line-through">{rsvp.name}</span>
-                                    <span className="text-[10px] text-[#C7A153] uppercase">Não comparecerá</span>
+                                    <span className="text-[10px] text-red-400/80 uppercase">Não comparecerá</span>
                                   </div>
                                 ))}
                               </div>
@@ -388,7 +436,7 @@ export default function App() {
 
                     {adminTab === 'fotos' && (
                       <div className="space-y-4">
-                        {photos.length === 0 ? <p className="text-center text-sm text-[#C7A153] italic">Nenhum registo enviado ainda.</p> : (
+                        {photos.length === 0 ? <p className="text-center text-sm text-[#C7A153] italic">Nenhum registro enviado ainda.</p> : (
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                             {photos.map(photo => (
                               <div key={photo.id} className="relative group rounded-sm overflow-hidden border border-[#C7A153]/20 bg-black">
@@ -438,7 +486,6 @@ export default function App() {
                     </div>
                   </div>
                   
-                  {/* ENDEREÇO CLICÁVEL (GOOGLE MAPS) */}
                   <button 
                     onClick={handleMapOpen}
                     type="button"
@@ -479,7 +526,7 @@ export default function App() {
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Camiseta</span> <span>Tam M</span></div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Calça/Shorts</span> <span>Tam M (Jeans 38)</span></div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Vestido</span> <span>Tam M</span></div>
-                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Sapatos/Ténis</span> <span>Tam 37</span></div>
+                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Sapatos/Tênis</span> <span>Tam 37</span></div>
                     </div>
                   </div>
                   <div className="relative">
@@ -495,13 +542,13 @@ export default function App() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-sm font-medium text-[#FFF0B3]">
                       <div className="flex flex-col border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold mb-1">Perfumes / Cremes Hidratantes</span> <span className="text-xs">Nada amadeirado ou MUITO doce.</span></div>
                       <div className="flex flex-col border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold mb-1">Cabelo</span> <span className="text-xs">Produtos em geral.</span></div>
-                      <div className="flex flex-col md:col-span-2 border-b border-[#C7A153]/30 pb-2 text-center items-center"><span className="text-[#C7A153] font-bold mb-1">Maquilhagem</span> <span className="text-xs">Qualquer marca (exceto Max Love).</span></div>
+                      <div className="flex flex-col md:col-span-2 border-b border-[#C7A153]/30 pb-2 text-center items-center"><span className="text-[#C7A153] font-bold mb-1">Maquiagem</span> <span className="text-xs">Qualquer marca (exceto Max Love).</span></div>
                     </div>
                   </div>
                   
                   <div className="mt-8 text-center pt-8 border-t border-[#C7A153]/30">
                     <Heart className="mx-auto text-[#C7A153] mb-3" strokeWidth={1.5} size={24} />
-                    <p className="text-xs font-bold text-[#C7A153] uppercase tracking-widest">Cores Favoritas: Vermelho, Rosa Bebé, Preto e Branco.</p>
+                    <p className="text-xs font-bold text-[#C7A153] uppercase tracking-widest">Cores Favoritas: Vermelho, Rosa Bebê, Preto e Branco.</p>
                   </div>
                 </div>
               </div>
@@ -512,7 +559,7 @@ export default function App() {
               <div className="max-w-md mx-auto space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="text-center space-y-4">
                   <h3 className="text-3xl font-serif italic gold-gradient-text font-semibold">Confirme a sua Presença</h3>
-                  <p className="font-sans text-[#FFF0B3] font-medium text-sm opacity-95">A sua presença é fundamental. Por favor, confirme até ao dia 10 de Junho.</p>
+                  <p className="font-sans text-[#FFF0B3] font-medium text-sm opacity-95">A sua presença é fundamental. Por favor, confirme até o dia 10 de Junho.</p>
                 </div>
 
                 <form onSubmit={handleRsvpSubmit} className="space-y-8 font-sans font-medium relative">
@@ -558,11 +605,11 @@ export default function App() {
                   </div>
                 </div>
                 {photos.length === 0 ? (
-                  <div className="text-center py-16 border border-dashed border-[#C7A153]/30 rounded-lg"><Camera className="mx-auto text-[#C7A153] mb-4" strokeWidth={1.5} size={40} /><p className="font-serif italic font-medium text-[#C7A153]">A galeria aguarda os primeiros registos...</p></div>
+                  <div className="text-center py-16 border border-dashed border-[#C7A153]/30 rounded-lg"><Camera className="mx-auto text-[#C7A153] mb-4" strokeWidth={1.5} size={40} /><p className="font-serif italic font-medium text-[#C7A153]">A galeria aguarda os primeiros registros...</p></div>
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                     {photos.map(photo => (
-                      <div key={photo.id} className="aspect-square overflow-hidden rounded-sm border border-[#C7A153]/30 group relative bg-black">
+                      <div key={photo.id} className="relative group rounded-sm overflow-hidden border border-[#C7A153]/20 bg-black">
                         {photo.type === 'video' ? <video src={photo.url} className="w-full h-32 object-cover" autoPlay muted loop playsInline /> : <img src={photo.url} alt="Festa" className="w-full h-full object-cover" />}
                         <div className="absolute inset-0 bg-[#110103]/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
                           <button onClick={() => handleDownloadPhoto(photo.url, photo.type === 'video' ? `video_${photo.id}.mp4` : `foto_${photo.id}.jpg`)} className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[#FFF0B3] border border-[#C7A153] px-3 py-2 bg-[#C7A153]/10"><Download size={14} /> Baixar</button>
