@@ -2,7 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Camera, CheckCircle, MapPin, Calendar, Clock, Upload, Heart, HeartCrack, Wine, MessageSquareText, Lock, Download, Users, LogOut, XCircle, AlertCircle } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, onSnapshot } from "firebase/firestore";
+// NOVA IMPORTAÇÃO: Funções do Storage para guardar as fotos!
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
+// --- CONFIGURAÇÃO DO FIREBASE (NOVO PROJETO) ---
 const firebaseConfig = {
   apiKey: "AIzaSyBlBK9Xne3t9JldmT5zfJd_JT007aaMPrg",
   authDomain: "site-maria-eduarda-novo.firebaseapp.com",
@@ -15,31 +18,42 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+// INICIALIZAÇÃO DO STORAGE
+const storage = getStorage(app);
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('convite');
   
+  // --- ESTADOS DE DADOS (FIREBASE) ---
   const [rsvps, setRsvps] = useState([]);
   const [messages, setMessages] = useState([]);
   const [photos, setPhotos] = useState([]);
   
+  // --- ESTADOS DO FORMULÁRIO DE PRESENÇA ---
   const [rsvpForm, setRsvpForm] = useState({ 
     name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' 
   });
   
   const fileInputRef = useRef(null);
+  
+  // --- ESTADOS DO LIVRO DE OURO ---
   const [currentMessage, setCurrentMessage] = useState({ author: '', text: '' });
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [adminTab, setAdminTab] = useState('rsvps');
   const [isLoaded, setIsLoaded] = useState(false);
+  
+  // Estado para controlar o carregamento da imagem (Loading)
+  const [isUploading, setIsUploading] = useState(false);
 
+  // --- ESTADO DO MODAL FLUTUANTE (SUCESSO, PENA OU ERRO) ---
   const [modal, setModal] = useState({ isOpen: false, type: 'success', message: '' });
 
   const showModal = (type, message) => setModal({ isOpen: true, type, message });
   const closeModal = () => setModal({ isOpen: false, type: 'success', message: '' });
 
+  // --- EFEITO 1: CARREGAMENTO VISUAL TEMA DO BAILE ---
   useEffect(() => {
     document.title = "Aniversário 15 anos Maria Eduarda";
     document.documentElement.setAttribute('lang', 'pt-BR');
@@ -72,9 +86,11 @@ export default function App() {
     return () => clearTimeout(fallbackTimer);
   }, []);
 
+  // --- EFEITO 2: BUSCA DE DADOS DIRETAMENTE DO SEU FIREBASE ---
   useEffect(() => {
     let unsubRsvps = () => {};
     let unsubMessages = () => {};
+    let unsubPhotos = () => {};
 
     try {
       unsubRsvps = onSnapshot(collection(db, "presencas"), (snapshot) => {
@@ -96,6 +112,18 @@ export default function App() {
         });
         setMessages(dataList);
       }, (error) => console.error("Erro ao ler Mensagens:", error));
+      
+      // NOVA BUSCA: Fotos e Vídeos do banco de dados
+      unsubPhotos = onSnapshot(collection(db, "fotos"), (snapshot) => {
+        let dataList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        dataList.sort((a, b) => {
+          const tA = a.data ? new Date(a.data).getTime() : 0;
+          const tB = b.data ? new Date(b.data).getTime() : 0;
+          return tB - tA;
+        });
+        setPhotos(dataList);
+      }, (error) => console.error("Erro ao ler Fotos:", error));
+
     } catch(err) {
       console.error("Erro ao configurar banco de dados", err);
     }
@@ -103,6 +131,7 @@ export default function App() {
     return () => {
       unsubRsvps();
       unsubMessages();
+      unsubPhotos();
     };
   }, []);
 
@@ -112,6 +141,7 @@ export default function App() {
     window.open("https://maps.app.goo.gl/bdwsnZq7ipQEJhQL9", "_blank", "noopener,noreferrer");
   };
 
+  // --- AÇÕES DO FORMULÁRIO DE PRESENÇA ---
   const handleRsvpSubmit = (e) => {
     e.preventDefault();
 
@@ -132,7 +162,7 @@ export default function App() {
     
     const isDuplicate = rsvps.some(r => r.name.toLowerCase().trim() === nomeDigitado.toLowerCase());
     if (isDuplicate) {
-      return showModal('error', "Este nome já consta na nossa lista de presenças! Se precisar de alterar algo, entre em contato com a família.");
+      return showModal('error', "Este nome já consta na nossa lista de presenças! Se precisar de alterar algo, entre em contacto com a família.");
     }
     
     let totalGuests = 1; 
@@ -141,6 +171,7 @@ export default function App() {
     if (rsvpForm.child2Name.trim()) totalGuests++;
     if (rsvpForm.child3Name.trim()) totalGuests++;
     
+    // --- GERAÇÃO DA MENSAGEM AUTOMÁTICA PARA O WHATSAPP ---
     let wpText = `*NOVA RESPOSTA DE PRESENÇA - 15 ANOS DUDA* 🎭\n\n`;
     wpText += `*Convidado Principal:* ${rsvpForm.name}\n`;
     wpText += `*Status:* ${rsvpForm.attending === 'yes' ? '✅ CONFIRMADO' : '❌ NÃO PODERÁ IR'}\n`;
@@ -196,15 +227,40 @@ export default function App() {
     });
   };
 
-  const handleMediaUpload = (e) => {
+  // --- NOVA AÇÃO DE UPLOAD PARA O STORAGE DO FIREBASE ---
+  const handleMediaUpload = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const isVideo = file.type.startsWith('video/');
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotos([{ id: Date.now(), url: reader.result, type: isVideo ? 'video' : 'image' }, ...photos]);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    setIsUploading(true); // Ativa o botão de "A Carregar..."
+    
+    const isVideo = file.type.startsWith('video/');
+    
+    // Cria um nome único para o arquivo
+    const fileName = `${Date.now()}_${file.name}`;
+    const storageRef = ref(storage, `galeria/${fileName}`);
+
+    try {
+      // 1. Envia o arquivo para a "caixa forte" (Storage)
+      const uploadTask = await uploadBytesResumable(storageRef, file);
+      
+      // 2. Pede o "link" oficial desse arquivo salvo
+      const downloadURL = await getDownloadURL(uploadTask.ref);
+
+      // 3. Salva esse link no banco de textos (Firestore) para podermos listar depois
+      await addDoc(collection(db, "fotos"), {
+        url: downloadURL,
+        type: isVideo ? 'video' : 'image',
+        data: new Date().toISOString()
+      });
+
+      showModal('success', "A sua recordação foi guardada com sucesso!");
+    } catch (error) {
+      console.error("Erro ao enviar ficheiro:", error);
+      showModal('error', "Erro ao enviar o seu arquivo. Verificou as regras do Firebase Storage?");
+    } finally {
+      setIsUploading(false); // Volta o botão ao normal
+      if (fileInputRef.current) fileInputRef.current.value = ""; // Limpa a entrada
     }
   };
 
@@ -221,6 +277,7 @@ export default function App() {
     const link = document.createElement('a');
     link.href = url;
     link.download = fileName;
+    link.target = "_blank"; // Garante que abre caso o download direto seja bloqueado
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -265,7 +322,6 @@ export default function App() {
 
         <div className="relative z-10 container mx-auto px-4 py-12 md:py-20 min-h-screen flex flex-col items-center">
           
-          {}
           <header className="text-center mb-12 w-full flex flex-col items-center" style={{ animation: 'fadeInDown 0.8s ease-out forwards' }}>
             <h2 className="text-xs md:text-sm tracking-[0.4em] uppercase mb-6 text-[#C7A153] font-light">Os Meus 15 Anos</h2>
             <h1 className="text-7xl md:text-8xl lg:text-9xl mb-6 font-script gold-gradient-text drop-shadow-2xl font-normal tracking-wide" style={{ lineHeight: '1.2' }}>
@@ -299,7 +355,7 @@ export default function App() {
 
           <main className="w-full max-w-3xl glass-panel rounded-lg p-8 md:p-16 transition-all duration-700">
             
-            {}
+            {/* TAB: ADMIN (ÁREA DE CONTROLE REORGANIZADA) */}
             {activeTab === 'admin' && (
               <div className="space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 {!isAdmin ? (
@@ -339,6 +395,7 @@ export default function App() {
                         {rsvps.length === 0 ? <p className="text-center text-sm text-[#C7A153] italic">Nenhuma confirmação carregada.</p> : (
                           <div className="space-y-8">
                             
+                            {/* LISTA DE CONFIRMADOS (ORGANIZADA) */}
                             <div>
                               <h4 className="text-[#FFF0B3] border-b border-[#C7A153]/30 pb-2 mb-4 text-sm uppercase tracking-widest flex items-center justify-between font-medium">
                                 Lista de Convidados (Confirmados) <CheckCircle size={14} className="text-[#C7A153]" />
@@ -348,6 +405,7 @@ export default function App() {
                                 {rsvps.filter(r => r.attending === 'yes').map((rsvp, idx) => (
                                   <div key={idx} className="bg-[#110103]/60 p-5 rounded-md border border-[#C7A153]/30 text-sm shadow-md transition-hover hover:border-[#C7A153]/70">
                                     
+                                    {/* Cabeçalho do Card */}
                                     <div className="flex justify-between items-center mb-3 border-b border-[#C7A153]/20 pb-3">
                                       <div>
                                         <span className="text-[#FFF0B3] font-bold text-base md:text-lg block">{rsvp.name}</span>
@@ -356,6 +414,7 @@ export default function App() {
                                       <span className="text-[10px] text-[#110103] uppercase font-bold bg-[#C7A153] px-3 py-1 rounded-full">{rsvp.guests || 1} pessoa(s)</span>
                                     </div>
                                     
+                                    {/* Detalhes de Acompanhantes e Filhos */}
                                     {(rsvp.companion || rsvp.child1Name || rsvp.child2Name || rsvp.child3Name) ? (
                                       <div className="space-y-2 mt-3 bg-black/30 p-3 rounded border border-[#C7A153]/10">
                                         {rsvp.companion && (
@@ -391,6 +450,7 @@ export default function App() {
                               </div>
                             </div>
 
+                            {/* LISTA DE AUSENTES */}
                             <div>
                               <h4 className="text-[#FFF0B3] border-b border-[#C7A153]/30 pb-2 mb-3 text-sm uppercase tracking-widest flex items-center justify-between font-medium">Não irão (Ausentes) <Users size={14} className="text-[#C7A153]" /></h4>
                               <div className="space-y-2">
@@ -439,7 +499,7 @@ export default function App() {
               </div>
             )}
 
-            {}
+            {/* TAB: CONVITE */}
             {activeTab === 'convite' && (
               <div className="text-center space-y-12" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="space-y-6">
@@ -496,7 +556,7 @@ export default function App() {
               </div>
             )}
 
-            {}
+            {/* TAB: SUGESTÕES DE PRESENTE */}
             {activeTab === 'presentes' && (
               <div className="space-y-12" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="text-center space-y-4">
@@ -510,7 +570,7 @@ export default function App() {
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Camiseta</span> <span>Tam M</span></div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Calça/Shorts</span> <span>Tam M (Jeans 38)</span></div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Vestido</span> <span>Tam M</span></div>
-                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Sapatos/Tênis</span> <span>Tam 37</span></div>
+                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Sapatos/Ténis</span> <span>Tam 37</span></div>
                     </div>
                   </div>
                   <div className="relative">
@@ -538,7 +598,7 @@ export default function App() {
               </div>
             )}
 
-            {}
+            {/* TAB: PRESENÇA */}
             {activeTab === 'rsvp' && (
               <div className="max-w-md mx-auto space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="text-center space-y-4">
@@ -577,7 +637,7 @@ export default function App() {
               </div>
             )}
 
-            {}
+            {/* TAB: GALERIA COM UPLOAD NOVO */}
             {activeTab === 'galeria' && (
               <div className="space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="text-center space-y-4">
@@ -585,7 +645,13 @@ export default function App() {
                   <p className="font-sans text-[#FFF0B3] font-medium text-sm max-w-lg mx-auto opacity-95">Tirou uma foto ou gravou um vídeo lindo na festa? Envie aqui.</p>
                   <input type="file" accept="image/*,video/*" ref={fileInputRef} onChange={handleMediaUpload} className="hidden" />
                   <div className="pt-6">
-                    <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-3 border border-[#C7A153] text-[#FFF0B3] px-8 py-3 rounded-full font-bold hover:bg-[#C7A153]/20 transition-all text-xs uppercase tracking-widest"><Upload size={16} strokeWidth={2} /> Carregar</button>
+                    <button 
+                      onClick={() => fileInputRef.current?.click()} 
+                      disabled={isUploading}
+                      className="inline-flex items-center gap-3 border border-[#C7A153] text-[#FFF0B3] px-8 py-3 rounded-full font-bold hover:bg-[#C7A153]/20 transition-all text-xs uppercase tracking-widest disabled:opacity-50"
+                    >
+                      {isUploading ? "A carregar..." : <><Upload size={16} strokeWidth={2} /> Carregar</>}
+                    </button>
                   </div>
                 </div>
                 {photos.length === 0 ? (
@@ -605,7 +671,7 @@ export default function App() {
               </div>
             )}
 
-            {}
+            {/* TAB: LIVRO DE OURO SEM IA */}
             {activeTab === 'recados' && (
               <div className="space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="text-center space-y-4">
@@ -648,7 +714,7 @@ export default function App() {
           </footer>
         </div>
 
-        {}
+        {/* MODAL FLUTUANTE UNIFICADO */}
         {modal.isOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0a0002]/90 backdrop-blur-sm p-4" style={{ animation: 'fadeIn 0.3s ease-out' }}>
             <div className="bg-[#110103] border border-[#C7A153] shadow-[0_0_50px_rgba(199,161,83,0.3)] rounded-lg p-8 max-w-sm w-full text-center relative" style={{ animation: 'fadeInDown 0.4s ease-out' }}>
