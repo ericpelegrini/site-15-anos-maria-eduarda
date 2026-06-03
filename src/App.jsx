@@ -1,16 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, CheckCircle, MapPin, Calendar, Clock, Upload, Heart, Wine, MessageSquareText, Lock, Download, Users, LogOut, XCircle, HeartCrack, AlertCircle } from 'lucide-react';
+import { Camera, CheckCircle, MapPin, Calendar, Clock, Upload, Heart, HeartCrack, Wine, MessageSquareText, Lock, Download, Users, LogOut, XCircle, AlertCircle } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, onSnapshot } from "firebase/firestore";
 
-// --- CONFIGURAÇÃO DO FIREBASE (SEU BANCO DE DADOS OFICIAL) ---
 const firebaseConfig = {
-  apiKey: "AIzaSyAZ_JQZRNHMAoIXZ12Z3b9rTINf90t2ic1IAY",
-  authDomain: "site-maria-eduarda-eaa2b.firebaseapp.com",
-  projectId: "site-maria-eduarda-eaa2b",
-  storageBucket: "site-maria-eduarda-eaa2b.appspot.com",
-  messagingSenderId: "68809862594",
-  appId: "1:68809862594:web:234f9e5f7689fbebeb2cb"
+  apiKey: "AIzaSyBlBK9Xne3t9JldmT5zfJd_JT007aaMPrg",
+  authDomain: "site-maria-eduarda-novo.firebaseapp.com",
+  projectId: "site-maria-eduarda-novo",
+  storageBucket: "site-maria-eduarda-novo.firebasestorage.app",
+  messagingSenderId: "396088146162",
+  appId: "1:396088146162:web:186411df9f5a8cc5b8f86b",
+  measurementId: "G-817HE2B0WC"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -19,19 +19,15 @@ const db = getFirestore(app);
 export default function App() {
   const [activeTab, setActiveTab] = useState('convite');
   
-  // --- ESTADOS DE DADOS (FIREBASE) ---
   const [rsvps, setRsvps] = useState([]);
   const [messages, setMessages] = useState([]);
   const [photos, setPhotos] = useState([]);
   
-  // --- ESTADOS DO FORMULÁRIO DE PRESENÇA ---
   const [rsvpForm, setRsvpForm] = useState({ 
     name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' 
   });
   
   const fileInputRef = useRef(null);
-  
-  // --- ESTADOS DO LIVRO DE OURO ---
   const [currentMessage, setCurrentMessage] = useState({ author: '', text: '' });
 
   const [isAdmin, setIsAdmin] = useState(false);
@@ -39,13 +35,11 @@ export default function App() {
   const [adminTab, setAdminTab] = useState('rsvps');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // --- ESTADO DO MODAL FLUTUANTE ---
   const [modal, setModal] = useState({ isOpen: false, type: 'success', message: '' });
 
   const showModal = (type, message) => setModal({ isOpen: true, type, message });
   const closeModal = () => setModal({ isOpen: false, type: 'success', message: '' });
 
-  // --- EFEITO 1: CARREGAMENTO VISUAL ---
   useEffect(() => {
     document.title = "Aniversário 15 anos Maria Eduarda";
     document.documentElement.setAttribute('lang', 'pt-BR');
@@ -78,7 +72,6 @@ export default function App() {
     return () => clearTimeout(fallbackTimer);
   }, []);
 
-  // --- EFEITO 2: BUSCA DE DADOS DIRETAMENTE DO FIREBASE ---
   useEffect(() => {
     let unsubRsvps = () => {};
     let unsubMessages = () => {};
@@ -113,15 +106,13 @@ export default function App() {
     };
   }, []);
 
-  // --- ABERTURA FORÇADA E SEGURA DO MAPA ---
   const handleMapOpen = (e) => {
     e.preventDefault();
     e.stopPropagation();
     window.open("https://maps.app.goo.gl/bdwsnZq7ipQEJhQL9", "_blank", "noopener,noreferrer");
   };
 
-  // --- AÇÕES DO FORMULÁRIO DE PRESENÇA ---
-  const handleRsvpSubmit = async (e) => {
+  const handleRsvpSubmit = (e) => {
     e.preventDefault();
 
     const nomeDigitado = rsvpForm.name.trim();
@@ -141,42 +132,51 @@ export default function App() {
     
     const isDuplicate = rsvps.some(r => r.name.toLowerCase().trim() === nomeDigitado.toLowerCase());
     if (isDuplicate) {
-      return showModal('error', "Este nome já consta na nossa lista de presenças! Se precisar de alterar algo, entre em contacto com a família.");
+      return showModal('error', "Este nome já consta na nossa lista de presenças! Se precisar de alterar algo, entre em contato com a família.");
     }
     
-    try {
-      let totalGuests = 1; 
-      if (rsvpForm.companion.trim()) totalGuests++;
-      if (rsvpForm.child1Name.trim()) totalGuests++;
-      if (rsvpForm.child2Name.trim()) totalGuests++;
-      if (rsvpForm.child3Name.trim()) totalGuests++;
-      
-      const dataToSave = {
-        ...rsvpForm,
-        guests: totalGuests,
-        data: new Date().toISOString()
-      };
-
-      // 1. ABRIR A CAIXA FLUTUANTE IMEDIATAMENTE
-      if (rsvpForm.attending === 'yes') {
-        showModal('success', "A sua presença foi confirmada com sucesso, vemo-nos no baile!");
-      } else {
-        showModal('pity', "Que pena que não poderá comparecer, a sua presença fará muita falta!");
-      }
-      
-      // 2. LIMPAR O FORMULÁRIO
-      setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
-
-      // 3. SALVAR NO FIREBASE EM SEGUNDO PLANO
-      await addDoc(collection(db, "presencas"), dataToSave);
-
-    } catch (error) {
-      console.error("Erro ao salvar RSVP:", error);
-      showModal('error', "Não foi possível ligar ao servidor. Verifique a sua internet. Detalhe técnico: " + error.message);
+    let totalGuests = 1; 
+    if (rsvpForm.companion.trim()) totalGuests++;
+    if (rsvpForm.child1Name.trim()) totalGuests++;
+    if (rsvpForm.child2Name.trim()) totalGuests++;
+    if (rsvpForm.child3Name.trim()) totalGuests++;
+    
+    let wpText = `*NOVA RESPOSTA DE PRESENÇA - 15 ANOS DUDA* 🎭\n\n`;
+    wpText += `*Convidado Principal:* ${rsvpForm.name}\n`;
+    wpText += `*Status:* ${rsvpForm.attending === 'yes' ? '✅ CONFIRMADO' : '❌ NÃO PODERÁ IR'}\n`;
+    
+    if (rsvpForm.attending === 'yes') {
+        if (rsvpForm.companion.trim()) wpText += `*Acompanhante:* ${rsvpForm.companion}\n`;
+        if (rsvpForm.child1Name.trim()) wpText += `*Filho(a) 1:* ${rsvpForm.child1Name} (${rsvpForm.child1Age} anos)\n`;
+        if (rsvpForm.child2Name.trim()) wpText += `*Filho(a) 2:* ${rsvpForm.child2Name} (${rsvpForm.child2Age} anos)\n`;
+        if (rsvpForm.child3Name.trim()) wpText += `*Filho(a) 3:* ${rsvpForm.child3Name} (${rsvpForm.child3Age} anos)\n`;
+        wpText += `\n*Total de pessoas:* ${totalGuests}`;
     }
+    
+    const numeroEsposa = "5511971030971";
+    const wpUrl = `https://wa.me/${numeroEsposa}?text=${encodeURIComponent(wpText)}`;
+    window.open(wpUrl, '_blank');
+
+    const dataToSave = {
+      ...rsvpForm,
+      guests: totalGuests,
+      data: new Date().toISOString()
+    };
+    
+    addDoc(collection(db, "presencas"), dataToSave).catch((error) => {
+      console.error("Erro no envio em segundo plano:", error);
+    });
+
+    if (rsvpForm.attending === 'yes') {
+      showModal('success', "A sua presença foi confirmada com sucesso, vemo-nos no baile! (Enviamos também para o nosso WhatsApp para controle).");
+    } else {
+      showModal('pity', "Que pena que não poderá comparecer, a sua presença fará muita falta!");
+    }
+    
+    setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
   };
 
-  const handleMessageSubmit = async (e) => {
+  const handleMessageSubmit = (e) => {
     e.preventDefault();
     if (!currentMessage.author || !currentMessage.text) {
         return showModal('error', "Por favor, preencha o seu nome e a mensagem.");
@@ -188,19 +188,12 @@ export default function App() {
       data: new Date().toISOString()
     };
 
-    try {
-      // 1. ABRIR A CAIXA FLUTUANTE IMEDIATAMENTE
-      showModal('success', "A sua mensagem foi deixada com carinho no Livro de Ouro!");
-      
-      // 2. LIMPAR O FORMULÁRIO
-      setCurrentMessage({ author: '', text: '' });
+    showModal('success', "A sua mensagem foi deixada com carinho no Livro de Ouro!");
+    setCurrentMessage({ author: '', text: '' });
 
-      // 3. SALVAR EM SEGUNDO PLANO
-      await addDoc(collection(db, "mensagens"), dataToSave);
-    } catch (error) {
-      console.error("Erro ao salvar mensagem:", error);
-      showModal('error', "Não foi possível assinar o livro. Detalhe técnico: " + error.message);
-    }
+    addDoc(collection(db, "mensagens"), dataToSave).catch((error) => {
+      console.error("Erro ao salvar mensagem em segundo plano:", error);
+    });
   };
 
   const handleMediaUpload = (e) => {
@@ -272,6 +265,7 @@ export default function App() {
 
         <div className="relative z-10 container mx-auto px-4 py-12 md:py-20 min-h-screen flex flex-col items-center">
           
+          {}
           <header className="text-center mb-12 w-full flex flex-col items-center" style={{ animation: 'fadeInDown 0.8s ease-out forwards' }}>
             <h2 className="text-xs md:text-sm tracking-[0.4em] uppercase mb-6 text-[#C7A153] font-light">Os Meus 15 Anos</h2>
             <h1 className="text-7xl md:text-8xl lg:text-9xl mb-6 font-script gold-gradient-text drop-shadow-2xl font-normal tracking-wide" style={{ lineHeight: '1.2' }}>
@@ -305,7 +299,7 @@ export default function App() {
 
           <main className="w-full max-w-3xl glass-panel rounded-lg p-8 md:p-16 transition-all duration-700">
             
-            {/* TAB: ADMIN */}
+            {}
             {activeTab === 'admin' && (
               <div className="space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 {!isAdmin ? (
@@ -316,15 +310,15 @@ export default function App() {
                       <p className="font-sans text-[#FFF0B3] font-light text-xs">Acesso exclusivo para a administração do evento.</p>
                     </div>
                     <form onSubmit={handleAdminLogin} className="space-y-6">
-                      <input type="text" placeholder="Utilizador" value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="w-full input-elegant text-sm text-center" />
-                      <input type="password" placeholder="Palavra-passe" value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} className="w-full input-elegant text-sm text-center" />
+                      <input type="text" placeholder="Usuário" value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="w-full input-elegant text-sm text-center" />
+                      <input type="password" placeholder="Senha" value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} className="w-full input-elegant text-sm text-center" />
                       <button type="submit" className="w-full border border-[#C7A153] text-[#FFF0B3] hover:bg-[#C7A153]/10 py-3 rounded-sm transition-all text-xs uppercase tracking-[0.2em]">Entrar</button>
                     </form>
                   </div>
                 ) : (
                   <div className="space-y-8">
                     <div className="flex justify-between items-center border-b border-[#C7A153]/20 pb-6">
-                      <h3 className="text-2xl font-serif italic gold-gradient-text">Painel de Controlo</h3>
+                      <h3 className="text-2xl font-serif italic gold-gradient-text">Painel de Controle</h3>
                       <button onClick={() => setIsAdmin(false)} className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[#C7A153] hover:text-[#FFF0B3]"><LogOut size={14} /> Sair</button>
                     </div>
 
@@ -338,40 +332,72 @@ export default function App() {
                       <div className="space-y-6">
                         <div className="bg-[#110103]/60 p-4 rounded-sm border border-[#C7A153]/20 flex justify-around text-center mb-4">
                           <div><span className="block text-2xl font-serif text-[#FFF0B3]">{rsvps.filter(r => r.attending === 'yes').length}</span><span className="text-[10px] text-[#C7A153] uppercase">Convites</span></div>
-                          <div><span className="block text-2xl font-serif text-[#FFF0B3]">{rsvps.filter(r => r.attending === 'yes').reduce((acc, curr) => acc + (curr.guests || 1), 0)}</span><span className="text-[10px] text-[#C7A153] uppercase">Total de Pessoas</span></div>
+                          <div><span className="block text-2xl font-serif text-[#FFF0B3]">{rsvps.filter(r => r.attending === 'yes').reduce((acc, curr) => acc + (curr.guests || 1), 0)}</span><span className="text-[10px] text-[#C7A153] uppercase">Total Pessoas</span></div>
                           <div><span className="block text-2xl font-serif text-[#FFF0B3]">{rsvps.filter(r => r.attending === 'no').length}</span><span className="text-[10px] text-[#C7A153] uppercase">Ausentes</span></div>
                         </div>
                         
-                        {rsvps.length === 0 ? <p className="text-center text-sm text-[#C7A153] italic">Nenhuma confirmação ainda.</p> : (
-                          <div className="space-y-6">
+                        {rsvps.length === 0 ? <p className="text-center text-sm text-[#C7A153] italic">Nenhuma confirmação carregada.</p> : (
+                          <div className="space-y-8">
+                            
                             <div>
-                              <h4 className="text-[#FFF0B3] border-b border-[#C7A153]/30 pb-2 mb-3 text-sm uppercase tracking-widest flex items-center justify-between font-medium">Lista de Convidados (Confirmados) <CheckCircle size={14} className="text-[#C7A153]" /></h4>
-                              <div className="space-y-3">
+                              <h4 className="text-[#FFF0B3] border-b border-[#C7A153]/30 pb-2 mb-4 text-sm uppercase tracking-widest flex items-center justify-between font-medium">
+                                Lista de Convidados (Confirmados) <CheckCircle size={14} className="text-[#C7A153]" />
+                              </h4>
+                              
+                              <div className="space-y-4">
                                 {rsvps.filter(r => r.attending === 'yes').map((rsvp, idx) => (
-                                  <div key={idx} className="flex flex-col bg-[#110103]/40 p-4 rounded-sm border border-[#C7A153]/10 text-sm">
-                                    <div className="flex justify-between items-center mb-2">
-                                      <span className="text-[#FFF0B3] font-medium">{rsvp.name}</span>
-                                      <span className="text-[10px] text-[#C7A153] uppercase font-bold bg-[#C7A153]/10 px-2 py-1 rounded-sm">{rsvp.guests || 1} pessoa(s)</span>
-                                    </div>
-                                    {(rsvp.companion || rsvp.child1Name || rsvp.child2Name || rsvp.child3Name) && (
-                                      <div className="pl-3 border-l-2 border-[#C7A153]/20 space-y-1 mt-1">
-                                        {rsvp.companion && <span className="block text-xs text-[#FFF0B3]"><span className="text-[#C7A153]">Companheiro(a):</span> {rsvp.companion}</span>}
-                                        {rsvp.child1Name && <span className="block text-xs text-[#FFF0B3]"><span className="text-[#C7A153]">Filho(a) 1:</span> {rsvp.child1Name} <span className="text-[10px] text-[#C7A153]">({rsvp.child1Age} anos)</span></span>}
-                                        {rsvp.child2Name && <span className="block text-xs text-[#FFF0B3]"><span className="text-[#C7A153]">Filho(a) 2:</span> {rsvp.child2Name} <span className="text-[10px] text-[#C7A153]">({rsvp.child2Age} anos)</span></span>}
-                                        {rsvp.child3Name && <span className="block text-xs text-[#FFF0B3]"><span className="text-[#C7A153]">Filho(a) 3:</span> {rsvp.child3Name} <span className="text-[10px] text-[#C7A153]">({rsvp.child3Age} anos)</span></span>}
+                                  <div key={idx} className="bg-[#110103]/60 p-5 rounded-md border border-[#C7A153]/30 text-sm shadow-md transition-hover hover:border-[#C7A153]/70">
+                                    
+                                    <div className="flex justify-between items-center mb-3 border-b border-[#C7A153]/20 pb-3">
+                                      <div>
+                                        <span className="text-[#FFF0B3] font-bold text-base md:text-lg block">{rsvp.name}</span>
+                                        <span className="text-[10px] text-[#C7A153] uppercase tracking-wider">Convidado Principal</span>
                                       </div>
+                                      <span className="text-[10px] text-[#110103] uppercase font-bold bg-[#C7A153] px-3 py-1 rounded-full">{rsvp.guests || 1} pessoa(s)</span>
+                                    </div>
+                                    
+                                    {(rsvp.companion || rsvp.child1Name || rsvp.child2Name || rsvp.child3Name) ? (
+                                      <div className="space-y-2 mt-3 bg-black/30 p-3 rounded border border-[#C7A153]/10">
+                                        {rsvp.companion && (
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-[#C7A153] font-semibold text-xs uppercase tracking-wider w-28">Acompanhante:</span> 
+                                            <span className="text-[#FFF0B3] font-medium">{rsvp.companion}</span>
+                                          </div>
+                                        )}
+                                        {rsvp.child1Name && (
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[#C7A153] font-semibold text-xs uppercase tracking-wider w-28">Filho(a) 1:</span> 
+                                            <span className="text-[#FFF0B3] font-medium">{rsvp.child1Name} <span className="text-xs text-[#C7A153] ml-1">({rsvp.child1Age} anos)</span></span>
+                                          </div>
+                                        )}
+                                        {rsvp.child2Name && (
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[#C7A153] font-semibold text-xs uppercase tracking-wider w-28">Filho(a) 2:</span> 
+                                            <span className="text-[#FFF0B3] font-medium">{rsvp.child2Name} <span className="text-xs text-[#C7A153] ml-1">({rsvp.child2Age} anos)</span></span>
+                                          </div>
+                                        )}
+                                        {rsvp.child3Name && (
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[#C7A153] font-semibold text-xs uppercase tracking-wider w-28">Filho(a) 3:</span> 
+                                            <span className="text-[#FFF0B3] font-medium">{rsvp.child3Name} <span className="text-xs text-[#C7A153] ml-1">({rsvp.child3Age} anos)</span></span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="text-[11px] text-[#C7A153]/60 italic mt-3 bg-black/20 p-2 rounded">Irá sozinho(a). Sem acompanhantes ou filhos registrados.</div>
                                     )}
                                   </div>
                                 ))}
                               </div>
                             </div>
+
                             <div>
                               <h4 className="text-[#FFF0B3] border-b border-[#C7A153]/30 pb-2 mb-3 text-sm uppercase tracking-widest flex items-center justify-between font-medium">Não irão (Ausentes) <Users size={14} className="text-[#C7A153]" /></h4>
                               <div className="space-y-2">
                                 {rsvps.filter(r => r.attending === 'no').map((rsvp, idx) => (
-                                  <div key={idx} className="flex justify-between items-center bg-[#110103]/20 p-3 rounded-sm border border-[#C7A153]/5 text-sm opacity-60">
+                                  <div key={idx} className="flex justify-between items-center bg-[#110103]/20 p-3 rounded-sm border border-[#C7A153]/10 text-sm opacity-70">
                                     <span className="text-[#FFF0B3] line-through">{rsvp.name}</span>
-                                    <span className="text-[10px] text-[#C7A153] uppercase">Não comparecerá</span>
+                                    <span className="text-[10px] text-red-400/80 uppercase">Não comparecerá</span>
                                   </div>
                                 ))}
                               </div>
@@ -394,7 +420,7 @@ export default function App() {
 
                     {adminTab === 'fotos' && (
                       <div className="space-y-4">
-                        {photos.length === 0 ? <p className="text-center text-sm text-[#C7A153] italic">Nenhum registo enviado ainda.</p> : (
+                        {photos.length === 0 ? <p className="text-center text-sm text-[#C7A153] italic">Nenhum registro enviado ainda.</p> : (
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                             {photos.map(photo => (
                               <div key={photo.id} className="relative group rounded-sm overflow-hidden border border-[#C7A153]/20 bg-black">
@@ -413,7 +439,7 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB: CONVITE */}
+            {}
             {activeTab === 'convite' && (
               <div className="text-center space-y-12" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="space-y-6">
@@ -444,7 +470,6 @@ export default function App() {
                     </div>
                   </div>
                   
-                  {/* ENDEREÇO CLICÁVEL (GOOGLE MAPS) */}
                   <button 
                     onClick={handleMapOpen}
                     type="button"
@@ -471,7 +496,7 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB: SUGESTÕES DE PRESENTE */}
+            {}
             {activeTab === 'presentes' && (
               <div className="space-y-12" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="text-center space-y-4">
@@ -485,7 +510,7 @@ export default function App() {
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Camiseta</span> <span>Tam M</span></div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Calça/Shorts</span> <span>Tam M (Jeans 38)</span></div>
                       <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Vestido</span> <span>Tam M</span></div>
-                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Sapatos/Ténis</span> <span>Tam 37</span></div>
+                      <div className="flex justify-between border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold">Sapatos/Tênis</span> <span>Tam 37</span></div>
                     </div>
                   </div>
                   <div className="relative">
@@ -501,24 +526,24 @@ export default function App() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-sm font-medium text-[#FFF0B3]">
                       <div className="flex flex-col border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold mb-1">Perfumes / Cremes Hidratantes</span> <span className="text-xs">Nada amadeirado ou MUITO doce.</span></div>
                       <div className="flex flex-col border-b border-[#C7A153]/30 pb-2"><span className="text-[#C7A153] font-bold mb-1">Cabelo</span> <span className="text-xs">Produtos em geral.</span></div>
-                      <div className="flex flex-col md:col-span-2 border-b border-[#C7A153]/30 pb-2 text-center items-center"><span className="text-[#C7A153] font-bold mb-1">Maquilhagem</span> <span className="text-xs">Qualquer marca (exceto Max Love).</span></div>
+                      <div className="flex flex-col md:col-span-2 border-b border-[#C7A153]/30 pb-2 text-center items-center"><span className="text-[#C7A153] font-bold mb-1">Maquiagem</span> <span className="text-xs">Qualquer marca (exceto Max Love).</span></div>
                     </div>
                   </div>
                   
                   <div className="mt-8 text-center pt-8 border-t border-[#C7A153]/30">
                     <Heart className="mx-auto text-[#C7A153] mb-3" strokeWidth={1.5} size={24} />
-                    <p className="text-xs font-bold text-[#C7A153] uppercase tracking-widest">Cores Favoritas: Vermelho, Rosa Bebé, Preto e Branco.</p>
+                    <p className="text-xs font-bold text-[#C7A153] uppercase tracking-widest">Cores Favoritas: Vermelho, Rosa Bebê, Preto e Branco.</p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* TAB: PRESENÇA */}
+            {}
             {activeTab === 'rsvp' && (
               <div className="max-w-md mx-auto space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="text-center space-y-4">
                   <h3 className="text-3xl font-serif italic gold-gradient-text font-semibold">Confirme a sua Presença</h3>
-                  <p className="font-sans text-[#FFF0B3] font-medium text-sm opacity-95">A sua presença é fundamental. Por favor, confirme até ao dia 10 de Junho.</p>
+                  <p className="font-sans text-[#FFF0B3] font-medium text-sm opacity-95">A sua presença é fundamental. Por favor, confirme até o dia 10 de Junho.</p>
                 </div>
 
                 <form onSubmit={handleRsvpSubmit} className="space-y-8 font-sans font-medium relative">
@@ -552,7 +577,7 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB: GALERIA */}
+            {}
             {activeTab === 'galeria' && (
               <div className="space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="text-center space-y-4">
@@ -564,7 +589,7 @@ export default function App() {
                   </div>
                 </div>
                 {photos.length === 0 ? (
-                  <div className="text-center py-16 border border-dashed border-[#C7A153]/30 rounded-lg"><Camera className="mx-auto text-[#C7A153] mb-4" strokeWidth={1.5} size={40} /><p className="font-serif italic font-medium text-[#C7A153]">A galeria aguarda os primeiros registos...</p></div>
+                  <div className="text-center py-16 border border-dashed border-[#C7A153]/30 rounded-lg"><Camera className="mx-auto text-[#C7A153] mb-4" strokeWidth={1.5} size={40} /><p className="font-serif italic font-medium text-[#C7A153]">A galeria aguarda os primeiros registros...</p></div>
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                     {photos.map(photo => (
@@ -580,7 +605,7 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB: LIVRO DE OURO SEM IA */}
+            {}
             {activeTab === 'recados' && (
               <div className="space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="text-center space-y-4">
@@ -623,7 +648,7 @@ export default function App() {
           </footer>
         </div>
 
-        {/* MODAL FLUTUANTE UNIFICADO COM AS VARIAÇÕES DE DESIGN (SUCESSO, PENA E ERRO) */}
+        {}
         {modal.isOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0a0002]/90 backdrop-blur-sm p-4" style={{ animation: 'fadeIn 0.3s ease-out' }}>
             <div className="bg-[#110103] border border-[#C7A153] shadow-[0_0_50px_rgba(199,161,83,0.3)] rounded-lg p-8 max-w-sm w-full text-center relative" style={{ animation: 'fadeInDown 0.4s ease-out' }}>
