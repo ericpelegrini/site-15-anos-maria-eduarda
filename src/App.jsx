@@ -1,17 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, CheckCircle, MapPin, Calendar, Clock, Upload, Heart, HeartCrack, Wine, MessageSquareText, Lock, Download, Users, LogOut, XCircle, AlertCircle } from 'lucide-react';
+import { Camera, CheckCircle, MapPin, Calendar, Clock, Upload, Heart, Wine, MessageSquareText, Lock, Download, Users, LogOut, XCircle, HeartCrack, AlertCircle } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, onSnapshot } from "firebase/firestore";
 
-// --- CONFIGURAÇÃO DO FIREBASE (NOVO BANCO DE DADOS) ---
+// --- CONFIGURAÇÃO DO FIREBASE (SEU BANCO DE DADOS OFICIAL) ---
 const firebaseConfig = {
-  apiKey: "AIzaSyBlBK9Xne3t9JldmT5zfJd_JT007aaMPrg",
-  authDomain: "site-maria-eduarda-novo.firebaseapp.com",
-  projectId: "site-maria-eduarda-novo",
-  storageBucket: "site-maria-eduarda-novo.firebasestorage.app",
-  messagingSenderId: "396088146162",
-  appId: "1:396088146162:web:186411df9f5a8cc5b8f86b",
-  measurementId: "G-817HE2B0WC"
+  apiKey: "AIzaSyAZ_JQZRNHMAoIXZ12Z3b9rTINf90t2ic1IAY",
+  authDomain: "site-maria-eduarda-eaa2b.firebaseapp.com",
+  projectId: "site-maria-eduarda-eaa2b",
+  storageBucket: "site-maria-eduarda-eaa2b.appspot.com",
+  messagingSenderId: "68809862594",
+  appId: "1:68809862594:web:234f9e5f7689fbebeb2cb"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -20,15 +19,19 @@ const db = getFirestore(app);
 export default function App() {
   const [activeTab, setActiveTab] = useState('convite');
   
+  // --- ESTADOS DE DADOS (FIREBASE) ---
   const [rsvps, setRsvps] = useState([]);
   const [messages, setMessages] = useState([]);
   const [photos, setPhotos] = useState([]);
   
+  // --- ESTADOS DO FORMULÁRIO DE PRESENÇA ---
   const [rsvpForm, setRsvpForm] = useState({ 
     name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' 
   });
   
   const fileInputRef = useRef(null);
+  
+  // --- ESTADOS DO LIVRO DE OURO ---
   const [currentMessage, setCurrentMessage] = useState({ author: '', text: '' });
 
   const [isAdmin, setIsAdmin] = useState(false);
@@ -36,12 +39,13 @@ export default function App() {
   const [adminTab, setAdminTab] = useState('rsvps');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Estado da Caixa Flutuante
+  // --- ESTADO DO MODAL FLUTUANTE ---
   const [modal, setModal] = useState({ isOpen: false, type: 'success', message: '' });
 
   const showModal = (type, message) => setModal({ isOpen: true, type, message });
   const closeModal = () => setModal({ isOpen: false, type: 'success', message: '' });
 
+  // --- EFEITO 1: CARREGAMENTO VISUAL ---
   useEffect(() => {
     document.title = "Aniversário 15 anos Maria Eduarda";
     document.documentElement.setAttribute('lang', 'pt-BR');
@@ -74,6 +78,7 @@ export default function App() {
     return () => clearTimeout(fallbackTimer);
   }, []);
 
+  // --- EFEITO 2: BUSCA DE DADOS DIRETAMENTE DO FIREBASE ---
   useEffect(() => {
     let unsubRsvps = () => {};
     let unsubMessages = () => {};
@@ -108,13 +113,15 @@ export default function App() {
     };
   }, []);
 
+  // --- ABERTURA FORÇADA E SEGURA DO MAPA ---
   const handleMapOpen = (e) => {
     e.preventDefault();
     e.stopPropagation();
     window.open("https://maps.app.goo.gl/bdwsnZq7ipQEJhQL9", "_blank", "noopener,noreferrer");
   };
 
-  const handleRsvpSubmit = (e) => {
+  // --- AÇÕES DO FORMULÁRIO DE PRESENÇA ---
+  const handleRsvpSubmit = async (e) => {
     e.preventDefault();
 
     const nomeDigitado = rsvpForm.name.trim();
@@ -134,56 +141,42 @@ export default function App() {
     
     const isDuplicate = rsvps.some(r => r.name.toLowerCase().trim() === nomeDigitado.toLowerCase());
     if (isDuplicate) {
-      return showModal('error', "Este nome já consta na nossa lista de presenças! Se precisar de alterar algo, entre em contato com a família.");
+      return showModal('error', "Este nome já consta na nossa lista de presenças! Se precisar de alterar algo, entre em contacto com a família.");
     }
     
-    let totalGuests = 1; 
-    if (rsvpForm.companion.trim()) totalGuests++;
-    if (rsvpForm.child1Name.trim()) totalGuests++;
-    if (rsvpForm.child2Name.trim()) totalGuests++;
-    if (rsvpForm.child3Name.trim()) totalGuests++;
-    
-    // Geração do texto para o WhatsApp
-    let wpText = `*NOVA RESPOSTA DE PRESENÇA - 15 ANOS DUDA* 🎭\n\n`;
-    wpText += `*Convidado Principal:* ${rsvpForm.name}\n`;
-    wpText += `*Status:* ${rsvpForm.attending === 'yes' ? '✅ CONFIRMADO' : '❌ NÃO PODERÁ IR'}\n`;
-    
-    if (rsvpForm.attending === 'yes') {
-        if (rsvpForm.companion.trim()) wpText += `*Acompanhante:* ${rsvpForm.companion}\n`;
-        if (rsvpForm.child1Name.trim()) wpText += `*Filho(a) 1:* ${rsvpForm.child1Name} (${rsvpForm.child1Age} anos)\n`;
-        if (rsvpForm.child2Name.trim()) wpText += `*Filho(a) 2:* ${rsvpForm.child2Name} (${rsvpForm.child2Age} anos)\n`;
-        if (rsvpForm.child3Name.trim()) wpText += `*Filho(a) 3:* ${rsvpForm.child3Name} (${rsvpForm.child3Age} anos)\n`;
-        wpText += `\n*Total de pessoas:* ${totalGuests}`;
-    }
-    
-    // Abrir o WhatsApp
-    const numeroEsposa = "5511971030971";
-    const wpUrl = `https://wa.me/${numeroEsposa}?text=${encodeURIComponent(wpText)}`;
-    window.open(wpUrl, '_blank');
+    try {
+      let totalGuests = 1; 
+      if (rsvpForm.companion.trim()) totalGuests++;
+      if (rsvpForm.child1Name.trim()) totalGuests++;
+      if (rsvpForm.child2Name.trim()) totalGuests++;
+      if (rsvpForm.child3Name.trim()) totalGuests++;
+      
+      const dataToSave = {
+        ...rsvpForm,
+        guests: totalGuests,
+        data: new Date().toISOString()
+      };
 
-    // Salvar no Firebase em segundo plano
-    const dataToSave = {
-      ...rsvpForm,
-      guests: totalGuests,
-      data: new Date().toISOString()
-    };
-    
-    addDoc(collection(db, "presencas"), dataToSave).catch((error) => {
-      console.error("Erro no envio em segundo plano:", error);
-    });
+      // 1. ABRIR A CAIXA FLUTUANTE IMEDIATAMENTE
+      if (rsvpForm.attending === 'yes') {
+        showModal('success', "A sua presença foi confirmada com sucesso, vemo-nos no baile!");
+      } else {
+        showModal('pity', "Que pena que não poderá comparecer, a sua presença fará muita falta!");
+      }
+      
+      // 2. LIMPAR O FORMULÁRIO
+      setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
 
-    // Feedback Visual
-    if (rsvpForm.attending === 'yes') {
-      showModal('success', "A sua presença foi confirmada com sucesso, nos vemos no baile!");
-    } else {
-      showModal('pity', "Que pena que você não poderá comparecer, sua presença fará muita falta!");
+      // 3. SALVAR NO FIREBASE EM SEGUNDO PLANO
+      await addDoc(collection(db, "presencas"), dataToSave);
+
+    } catch (error) {
+      console.error("Erro ao salvar RSVP:", error);
+      showModal('error', "Não foi possível ligar ao servidor. Verifique a sua internet. Detalhe técnico: " + error.message);
     }
-    
-    // Limpar formulário
-    setRsvpForm({ name: '', companion: '', child1Name: '', child1Age: '', child2Name: '', child2Age: '', child3Name: '', child3Age: '', attending: 'yes' });
   };
 
-  const handleMessageSubmit = (e) => {
+  const handleMessageSubmit = async (e) => {
     e.preventDefault();
     if (!currentMessage.author || !currentMessage.text) {
         return showModal('error', "Por favor, preencha o seu nome e a mensagem.");
@@ -195,12 +188,19 @@ export default function App() {
       data: new Date().toISOString()
     };
 
-    showModal('success', "A sua mensagem foi deixada com carinho no Livro de Ouro!");
-    setCurrentMessage({ author: '', text: '' });
+    try {
+      // 1. ABRIR A CAIXA FLUTUANTE IMEDIATAMENTE
+      showModal('success', "A sua mensagem foi deixada com carinho no Livro de Ouro!");
+      
+      // 2. LIMPAR O FORMULÁRIO
+      setCurrentMessage({ author: '', text: '' });
 
-    addDoc(collection(db, "mensagens"), dataToSave).catch((error) => {
-      console.error("Erro ao salvar mensagem em segundo plano:", error);
-    });
+      // 3. SALVAR EM SEGUNDO PLANO
+      await addDoc(collection(db, "mensagens"), dataToSave);
+    } catch (error) {
+      console.error("Erro ao salvar mensagem:", error);
+      showModal('error', "Não foi possível assinar o livro. Detalhe técnico: " + error.message);
+    }
   };
 
   const handleMediaUpload = (e) => {
@@ -518,7 +518,7 @@ export default function App() {
               <div className="max-w-md mx-auto space-y-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
                 <div className="text-center space-y-4">
                   <h3 className="text-3xl font-serif italic gold-gradient-text font-semibold">Confirme a sua Presença</h3>
-                  <p className="font-sans text-[#FFF0B3] font-medium text-sm opacity-95">A sua presença é fundamental. Por favor, confirme até o dia 10 de Junho.</p>
+                  <p className="font-sans text-[#FFF0B3] font-medium text-sm opacity-95">A sua presença é fundamental. Por favor, confirme até ao dia 10 de Junho.</p>
                 </div>
 
                 <form onSubmit={handleRsvpSubmit} className="space-y-8 font-sans font-medium relative">
@@ -547,7 +547,7 @@ export default function App() {
                       </label>
                     </div>
                   </div>
-                  <button type="submit" className="w-full mt-8 border border-[#C7A153] hover:bg-[#C7A153]/20 text-[#FFF0B3] font-bold py-4 rounded-sm transition-all duration-500 text-xs uppercase tracking-[0.3em] shadow-[0_0_15px_rgba(199,161,83,0.2)]">Enviar Resposta</button>
+                  <button type="submit" className="w-full mt-8 bg-gradient-to-r from-[#C7A153]/90 to-[#C7A153]/60 hover:from-[#C7A153] hover:to-[#C7A153]/80 text-[#110103] font-bold py-4 rounded-sm transition-all duration-500 text-xs uppercase tracking-[0.3em] shadow-[0_0_15px_rgba(199,161,83,0.2)]">Enviar Resposta</button>
                 </form>
               </div>
             )}
@@ -623,7 +623,7 @@ export default function App() {
           </footer>
         </div>
 
-        {/* MODAL FLUTUANTE UNIFICADO */}
+        {/* MODAL FLUTUANTE UNIFICADO COM AS VARIAÇÕES DE DESIGN (SUCESSO, PENA E ERRO) */}
         {modal.isOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0a0002]/90 backdrop-blur-sm p-4" style={{ animation: 'fadeIn 0.3s ease-out' }}>
             <div className="bg-[#110103] border border-[#C7A153] shadow-[0_0_50px_rgba(199,161,83,0.3)] rounded-lg p-8 max-w-sm w-full text-center relative" style={{ animation: 'fadeInDown 0.4s ease-out' }}>
@@ -635,6 +635,7 @@ export default function App() {
                 <XCircle size={24} strokeWidth={1.5} />
               </button>
               
+              {/* ÍCONES: MUDA DE ACORDO COM O TIPO DE MENSAGEM */}
               {modal.type === 'success' && <CheckCircle className="mx-auto text-[#C7A153] mb-6 drop-shadow-[0_0_15px_rgba(199,161,83,0.5)]" size={64} strokeWidth={1.5} />}
               {modal.type === 'pity' && <HeartCrack className="mx-auto text-[#C7A153] mb-6 drop-shadow-[0_0_15px_rgba(199,161,83,0.5)]" size={64} strokeWidth={1.5} />}
               {modal.type === 'error' && <AlertCircle className="mx-auto text-red-500 mb-6 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]" size={64} strokeWidth={1.5} />}
